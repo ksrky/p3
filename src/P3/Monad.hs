@@ -7,15 +7,12 @@ module P3.Monad
     , ParserState (..)
     , stxStack
     , tokens
+    , Exception (..)
+    , ParserExceptM
     , Parser
     , ParserM
     , execParserM
     , liftParserM
-    , ParserTable (..)
-    , HasParserTable (..)
-    , Exception (..)
-    , MonadParserErr
-    , MonadInner
     , withBindPow
     , nextToken
     , nextToken_
@@ -25,6 +22,8 @@ module P3.Monad
     , popSyntax
     , mkAtom
     , mkNode
+    , ParserTable (..)
+    , HasParserTable (..)
     , getLeadingParsers
     , getTrailingParsers,
     ) where
@@ -51,28 +50,6 @@ data ParserState t = ParserState
 
 makeLenses ''ParserState
 
-type Parser t m = ParserContext t -> ParserState t -> m (ParserState t)
-
-type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) m)
-
-execParserM :: (Monad m) => ParserM t m a -> ParserContext t -> ParserState t -> m (ParserState t)
-execParserM m = execStateT . runReaderT m
-
-liftParserM :: (Monad m) => m a -> ParserM t m a
-liftParserM = lift . lift
-
-type LeadingParser t m = Parser t m
-type TrailingParser t m = Parser t m
-
-data ParserTable t m = ParserTable
-    { _leadingParsers  :: M.Map t [LeadingParser t m]
-    , _trailingParsers :: M.Map t [TrailingParser t m]
-    }
-
-makeClassy ''ParserTable
-
--- * Exceptions
-
 data Exception
     = NoMatchParsers
     | LowerBindingPower
@@ -80,9 +57,17 @@ data Exception
     | TokenEOF
     deriving (Eq, Show)
 
-class (MonadError Exception m) => MonadParserErr m
+type ParserExceptM t m = ExceptT Exception m
 
-class (MonadReader e m, HasParserTable e t m, MonadError Exception m) => MonadInner e t m
+type Parser t m = ParserContext t -> ParserState t -> ParserExceptM t m (ParserState t)
+
+type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) (ParserExceptM t m))
+
+execParserM :: Monad m => ParserM t m a -> ParserContext t -> ParserState t -> ParserExceptM t m (ParserState t)
+execParserM m = execStateT . runReaderT m
+
+liftParserM :: (Monad m) => ParserExceptM t m a -> ParserM t m a
+liftParserM = lift . lift
 
 -- * Operations
 
@@ -94,7 +79,7 @@ withBindPow bp = local (bindPow .~ bp)
 -- ** Tokens
 
 -- | Get the next token and consume it from the token stream.
-nextToken :: MonadParserErr m => ParserM t m t
+nextToken :: Monad m => ParserM t m t
 nextToken = do
     toks <- use tokens
     case toks of
@@ -102,11 +87,11 @@ nextToken = do
         []     -> throwError TokenEOF
 
 -- | `nextToken` but discard the token.
-nextToken_ :: MonadParserErr m => ParserM t m ()
+nextToken_ :: Monad m => ParserM t m ()
 nextToken_ = void nextToken
 
 -- | Get the next token without consuming it.
-peekToken :: MonadParserErr m => ParserM t m t
+peekToken :: Monad m => ParserM t m t
 peekToken = do
     toks <- use tokens
     case toks of
@@ -114,7 +99,7 @@ peekToken = do
         []    -> throwError TokenEOF
 
 -- | Match the next token with a predicate.
-matchToken :: MonadParserErr m => (t -> Bool) -> ParserM t m ()
+matchToken :: Monad m => (t -> Bool) -> ParserM t m ()
 matchToken p = do
     tok <- nextToken
     if p tok
@@ -151,16 +136,19 @@ mkNode name = mkNode' []
 
 -- ** Parser Table
 
-getLeadingParsers ::
-    (MonadReader e m, HasParserTable e t m, Token t) =>
-    t -> m [LeadingParser t m]
+data ParserTable t m = ParserTable
+    { _leadingParsers  :: M.Map t [Parser t m]
+    , _trailingParsers :: M.Map t [Parser t m]
+    }
+
+makeClassy ''ParserTable
+
+getLeadingParsers :: (MonadReader e m, HasParserTable e t m, Token t) => t -> ParserExceptM t m [Parser t m]
 getLeadingParsers tok = do
     ps <- view leadingParsers
     return $ concat $ M.lookup tok ps
 
-getTrailingParsers ::
-    (MonadReader e m, HasParserTable e t m, Token t) =>
-    t -> m [TrailingParser t m]
+getTrailingParsers :: (MonadReader e m, HasParserTable e t m, Token t) => t -> ParserExceptM t m [Parser t m]
 getTrailingParsers tok = do
     ps <- view trailingParsers
     return $ concat $ M.lookup tok ps

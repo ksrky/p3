@@ -18,7 +18,7 @@ import Data.List                  qualified as L
 import P3.Monad
 import P3.Types
 
-longestMatch :: MonadParserErr m => [Parser t m] -> ParserM t m ()
+longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
 longestMatch parsers = do
     ctx <- ask
     st <- get
@@ -27,22 +27,22 @@ longestMatch parsers = do
     let st' = head $ L.sortOn (^. tokens . to length) sts
     put st'
 
-tryParsers :: MonadParserErr m => [Parser t m] -> ParserContext t -> ParserState t -> LogicT m (ParserState t)
+tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> LogicT (ParserExceptM t m) (ParserState t)
 tryParsers parsers c s = foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
 
-parseLeading :: (Token t, MonadReader e m, HasParserTable e t m, MonadParserErr m) => ParserM t m ()
+parseLeading :: (Token t, MonadReader e m, HasParserTable e t m) => ParserM t m ()
 parseLeading = do
     tok <- nextToken
     parsers <- liftParserM $ getLeadingParsers tok
     longestMatch parsers `catchError` (\_ -> mkAtom tok)
     parseTrailing
 
-parseTrailing :: (Token t, MonadReader e m, HasParserTable e t m, MonadParserErr m) => ParserM t m ()
+parseTrailing :: (Token t, MonadReader e m, HasParserTable e t m) => ParserM t m ()
 parseTrailing = do
     tok <- peekToken
     parsers <- liftParserM $ getTrailingParsers tok
     longestMatch parsers
     `catchError` (\_ -> return ())
 
-parse :: (Token t, MonadReader e m, HasParserTable e t m, MonadParserErr m) => Parser t m
+parse :: (Token t, MonadReader e m, HasParserTable e t m) => Parser t m
 parse = execParserM parseLeading

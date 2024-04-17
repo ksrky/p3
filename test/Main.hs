@@ -2,7 +2,6 @@
 
 module Main (main) where
 
-import Control.Monad.Except
 import Control.Monad.Reader
 import P3.Combinators
 import P3.Init
@@ -11,8 +10,8 @@ import P3.Utils.TH
 import Test.Hspec
 
 newtype ParserTestM a = ParserTestM
-    {unParserTestM :: ReaderT (ParserTable String ParserTestM) (Except Exception) a}
-    deriving (Functor, Applicative, Monad, MonadReader (ParserTable String ParserTestM), MonadError Exception, MonadParserErr)
+    {unParserTestM :: Reader (ParserTable String ParserTestM) a}
+    deriving (Functor, Applicative, Monad, MonadReader (ParserTable String ParserTestM))
 
 parserTbl :: ParserTable String ParserTestM
 parserTbl = initParserTable $ map mkParserEntry [syntaxs|
@@ -39,7 +38,7 @@ parserTbl = initParserTable $ map mkParserEntry [syntaxs|
 
 parseStrings :: [String] -> IO String
 parseStrings inp = do
-    case runExcept $ runReaderT (unParserTestM (runParser parse inp)) parserTbl of
+    case runReader (unParserTestM (runParser parse inp)) parserTbl of
         Left err  -> fail $ show err
         Right stx -> return $ show stx
 

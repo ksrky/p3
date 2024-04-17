@@ -10,6 +10,7 @@ module P3.Init
 
 import Control.Lens.At
 import Control.Lens.Operators
+import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Data.Either
 import Data.List                  qualified as L
@@ -29,15 +30,15 @@ mkParserState toks = ParserState
     , _tokens = toks
     }
 
-runParser :: Monad m => Parser t m -> [t] -> m Syntax
-runParser p toks = do
-    s <- p initParserContext (mkParserState toks)
-    return $ V.head $ s ^. stxStack
+runParser :: Monad m => Parser t m -> [t] -> m (Either Exception Syntax)
+runParser parser toks = runExceptT (parser initParserContext (mkParserState toks)) >>= \case
+    Left err -> return $ Left err
+    Right s -> return $ Right $ V.head $ s ^. stxStack
 
 type ParserEntry t m = Either (t, Parser t m) (t, Parser t m)
 
 class MkParserEntry a t | a -> t where
-    mkParserEntry :: (Token t, MonadReader e m, HasParserTable e t m, MonadParserErr m) => a -> ParserEntry t m
+    mkParserEntry :: (Token t, MonadReader e m, HasParserTable e t m) => a -> ParserEntry t m
 
 insertParserEntry :: Token t => ParserEntry t m -> ParserTable t m -> ParserTable t m
 insertParserEntry (Left (tok, p)) = leadingParsers . at tok %~ \case

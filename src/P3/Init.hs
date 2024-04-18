@@ -15,7 +15,6 @@ import Control.Monad.Reader.Class
 import Data.Either
 import Data.List                  qualified as L
 import Data.Map.Strict            qualified as M
-import Data.Vector                qualified as V
 import P3.Monad
 import P3.Types
 
@@ -26,14 +25,14 @@ initParserContext = ParserContext
 
 mkParserState :: [t] -> ParserState t
 mkParserState toks = ParserState
-    { _stxStack = V.empty
+    { _stxStack = []
     , _tokens = toks
     }
 
 runParser :: Monad m => Parser t m -> [t] -> m (Either Exception Syntax)
 runParser parser toks = runExceptT (parser initParserContext (mkParserState toks)) >>= \case
     Left err -> return $ Left err
-    Right s -> return $ Right $ V.head $ s ^. stxStack
+    Right s -> return $ Right $ head $ s ^. stxStack
 
 type ParserEntry t m = Either (t, Parser t m) (t, Parser t m)
 

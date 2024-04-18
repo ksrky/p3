@@ -93,8 +93,7 @@ library
                       logict,
                       mtl,
                       template-haskell,
-                      text,
-                      vector
+                      text
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -128,9 +127,8 @@ test-suite p3-test
                       P3.Example1.TH
 
     -- Test dependencies.
-    build-depends:
-        base ^>=4.17.2.1,
-        p3,
-        hspec,
-        mtl,
-        template-haskell
+    build-depends:    base ^>=4.17.2.1,
+                      p3,
+                      hspec,
+                      mtl,
+                      template-haskell

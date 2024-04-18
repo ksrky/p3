@@ -10,7 +10,6 @@ module P3.Types
 
 import Data.List                  qualified as L
 import Data.Text                  qualified as T
-import Data.Vector                qualified as V
 import Language.Haskell.TH.Syntax (Lift)
 
 -- | Parser name, which can be a node label of the syntax tree.
@@ -47,4 +46,4 @@ instance Show Syntax where
     show (Node (Name name) stxs) = name ++ " [" ++ L.intercalate ", " (map show stxs) ++ "]"
     show (Atom str) = show str
 
-type SyntaxStack = V.Vector Syntax
+type SyntaxStack = [Syntax]

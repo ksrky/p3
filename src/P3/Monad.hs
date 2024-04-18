@@ -34,7 +34,6 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Map.Strict          qualified as M
-import Data.Vector              qualified as V
 import P3.Types
 
 newtype ParserContext t = ParserContext
@@ -110,13 +109,13 @@ matchToken p = do
 
 -- | Push a syntax node to the syntax stack.
 pushSyntax :: Monad m => Syntax -> ParserM t m ()
-pushSyntax stx = stxStack %= V.cons stx
+pushSyntax stx = stxStack %= (stx :)
 
 -- | Pop a syntax node from the syntax stack.
 popSyntax :: Monad m => ParserM t m Syntax
 popSyntax = do
-    stx <- use $ stxStack . to V.head
-    stxStack %= V.tail
+    stx <- use $ stxStack . to head
+    stxStack %= tail
     return stx
 
 -- | Push `Atom` to the syntax stack.

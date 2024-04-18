@@ -1,4 +1,4 @@
-module P3.Utils.TH
+module P3.Example1.TH
     ( syntax
     , syntaxs
     ) where

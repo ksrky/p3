@@ -64,7 +64,6 @@ library
                       P3.Monad
                       P3.Types
                       P3.Utils
-                      P3.Utils.TH
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -123,11 +122,15 @@ test-suite p3-test
     hs-source-dirs:   test
 
     -- The entrypoint to the test suite.
-    main-is:          Main.hs
+    main-is:          Spec.hs
+
+    other-modules:    P3.Example1
+                      P3.Example1.TH
 
     -- Test dependencies.
     build-depends:
         base ^>=4.17.2.1,
         p3,
         hspec,
-        mtl
+        mtl,
+        template-haskell

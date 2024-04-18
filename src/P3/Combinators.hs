@@ -4,7 +4,7 @@ module P3.Combinators
     , mkNode
     , parseLeading
     , parseTrailing
-    , parse
+    , parserTop
     ) where
 
 import Control.Applicative
@@ -44,5 +44,5 @@ parseTrailing = do
     longestMatch parsers
     `catchError` (\_ -> return ())
 
-parse :: (Token t, MonadReader e m, HasParserTable e t m) => Parser t m
-parse = execParserM parseLeading
+parserTop :: (Token t, MonadReader e m, HasParserTable e t m) => Parser t m
+parserTop = execParserM parseLeading

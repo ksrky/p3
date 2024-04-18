@@ -1,7 +1,7 @@
 module P3.Utils
     ( Oper (..)
     , MixfixOp (..)
-    , parseOpExps
+    , parseOpers
     ) where
 
 import Control.Lens.Combinators
@@ -31,26 +31,26 @@ data MixfixOp t = MixfixOp
     }
     deriving (Show, Lift)
 
-parseOpExps :: (Token t, MonadReader e m, HasParserTable e t m) => [Oper t] -> ParserM t m ()
-parseOpExps oes = forM_ oes $ \case
-    Operator tok -> matchToken (tok ==)
+parseOpers :: (Token t, MonadReader e m, HasParserTable e t m) => [Oper t] -> ParserM t m ()
+parseOpers opers = forM_ opers $ \case
+    Operator t -> matchToken (t ==)
     Operand bp -> withBindPow bp parseLeading
 
 instance MkParserEntry (MixfixOp t) t where
-    mkParserEntry MixfixOp{name, opers = Operator tok0 : opers} = do
+    mkParserEntry MixfixOp{name, opers = Operator t0 : opers} = do
         let arity = length $ filter (\case Operand _ -> True; _ -> False) opers
             parser = execParserM $ do
-                parseOpExps opers
+                parseOpers opers
                 mkNode name arity
-        Left (tok0, parser)
-    mkParserEntry MixfixOp{name, opers = Operand bp0 : Operator tok1 : opers} = do
+        Left (t0, parser)
+    mkParserEntry MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = do
         let arity = 1 + length (filter (\case Operand _ -> True; _ -> False) opers)
             parser = execParserM $ do
                 bp <- view bindPow
                 when (bp0 < bp) $ throwError LowerBindingPower
                 nextToken_
-                parseOpExps opers
+                parseOpers opers
                 mkNode name arity
                 parseTrailing
-        Right (tok1, parser)
+        Right (t1, parser)
     mkParserEntry _ = error "invalid mixfix op"

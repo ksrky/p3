@@ -48,7 +48,7 @@ insertParserEntry (Right (tok, p)) = trailingParsers . at tok %~ \case
     Nothing -> Just [p]
     Just ps -> Just $ p : ps
 
-initParserTable ::Token t => [ParserEntry t m] -> ParserTable t m
+initParserTable :: Token t => [ParserEntry t m] -> ParserTable t m
 initParserTable entries = do
     let (lps, tps) = partitionEithers entries
     ParserTable

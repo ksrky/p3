@@ -1,12 +1,12 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module Main (main) where
+module P3.Example1 (spec) where
 
 import Control.Monad.Reader
 import P3.Combinators
 import P3.Init
 import P3.Monad
-import P3.Utils.TH
+import P3.Example1.TH
 import Test.Hspec
 
 newtype ParserTestM a = ParserTestM
@@ -37,13 +37,12 @@ parserTbl = initParserTable $ map mkParserEntry [syntaxs|
 |]
 
 parseStrings :: [String] -> IO String
-parseStrings inp = do
-    case runReader (unParserTestM (runParser parse inp)) parserTbl of
-        Left err  -> fail $ show err
-        Right stx -> return $ show stx
+parseStrings inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of
+    Left err  -> fail $ show err
+    Right stx -> return $ show stx
 
-main :: IO ()
-main = hspec $ do
+spec :: SpecWith ()
+spec = do
     describe "prefix parser test" $ do
         it "-3" $ do
             parseStrings ["-", "3"] `shouldReturn` "Neg [\"3\"]"

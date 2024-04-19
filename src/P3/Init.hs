@@ -6,6 +6,7 @@ module P3.Init
     , MkParserEntry (..)
     , insertParserEntry
     , initParserTable
+    , initParserCatTable
     ) where
 
 import Control.Lens.At
@@ -13,6 +14,7 @@ import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Data.Either
+import Data.IntMap                qualified as IM
 import Data.List                  qualified as L
 import Data.Map.Strict            qualified as M
 import P3.Monad
@@ -20,7 +22,8 @@ import P3.Types
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext
-    { _bindPow = 0
+    { _parserCat = 0
+    , _bindPow = 0
     }
 
 mkParserState :: [t] -> ParserState t
@@ -37,7 +40,7 @@ runParser parser toks = runExceptT (parser initParserContext (mkParserState toks
 type ParserEntry t m = Either (t, Parser t m) (t, Parser t m)
 
 class MkParserEntry a t | a -> t where
-    mkParserEntry :: (Token t, MonadReader e m, HasParserTable e t m) => a -> ParserEntry t m
+    mkParserEntry :: (Token t, MonadReader e m, HasParserCatTable e t m) => a -> ParserEntry t m
 
 insertParserEntry :: Token t => ParserEntry t m -> ParserTable t m -> ParserTable t m
 insertParserEntry (Left (tok, p)) = leadingParsers . at tok %~ \case
@@ -62,3 +65,6 @@ groupParsers = groupSnd . L.sortOn fst
     groupSnd [] = []
     groupSnd ((k, v) : xs) = (k, v : map snd ys) : groupSnd zs
         where (ys, zs) = span ((k ==) . fst) xs
+
+initParserCatTable :: [ParserTable t m] -> ParserCatTable t m
+initParserCatTable = IM.fromList . zip [0..]

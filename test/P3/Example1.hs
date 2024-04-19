@@ -4,37 +4,39 @@ module P3.Example1 (spec) where
 
 import Control.Monad.Reader
 import P3.Combinators
+import P3.Example1.TH
 import P3.Init
 import P3.Monad
-import P3.Example1.TH
 import Test.Hspec
 
 newtype ParserTestM a = ParserTestM
-    {unParserTestM :: Reader (ParserTable String ParserTestM) a}
-    deriving (Functor, Applicative, Monad, MonadReader (ParserTable String ParserTestM))
+    {unParserTestM :: Reader (ParserCatTable String ParserTestM) a}
+    deriving (Functor, Applicative, Monad, MonadReader (ParserCatTable String ParserTestM))
 
-parserTbl :: ParserTable String ParserTestM
-parserTbl = initParserTable $ map mkParserEntry [syntaxs|
-    Neg         "-" :75
-    Paren       "(" :0 ")"
-    Unit        "(" ")"
-    Pair        :11 "," :10
-    Or          :30 "||" :31
-    And         :35 "&&" :36
-    Eq          :50 "==" :50
-    Eq          :50 "/=" :50
-    Eq          :50 "<" :50
-    Eq          :50 "<=" :50
-    Eq          :50 ">" :50
-    Eq          :50 ">=" :50
-    Add         :65 "+" :66
-    Sub         :65 "-" :66
-    Mul         :70 "*" :71
-    Div         :70 "/" :71
-    Subscript   :100 "[" :0 "]"
-    IfThenElse  "if" :30 "then" :30 "else" :30
-    IfThen      "if" :30 "then" :30
-|]
+parserTbl :: ParserCatTable String ParserTestM
+parserTbl = initParserCatTable
+    [ initParserTable $ map mkParserEntry [syntaxs|
+        Neg         "-" :75
+        Paren       "(" :0 ")"
+        Unit        "(" ")"
+        Pair        :11 "," :10
+        Or          :30 "||" :31
+        And         :35 "&&" :36
+        Eq          :50 "==" :50
+        Ne          :50 "/=" :50
+        Lt          :50 "<" :50
+        Le          :50 "<=" :50
+        Gt          :50 ">" :50
+        Ge          :50 ">=" :50
+        Add         :65 "+" :66
+        Sub         :65 "-" :66
+        Mul         :70 "*" :71
+        Div         :70 "/" :71
+        Subscript   :100 "[" :0 "]"
+        IfThenElse  "if" :30 "then" :30 "else" :30
+        IfThen      "if" :30 "then" :30
+        |]
+    ]
 
 parseStrings :: [String] -> IO String
 parseStrings inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of

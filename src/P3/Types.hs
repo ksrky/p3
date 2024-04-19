@@ -3,6 +3,7 @@
 module P3.Types
     ( Name (..)
     , BindingPower
+    , ParserCategory
     , Token (..)
     , Syntax (..)
     , SyntaxStack
@@ -18,6 +19,9 @@ newtype Name = Name String
 
 -- | Each operand has a binding power.
 type BindingPower = Int
+
+-- | Parser category Id.
+type ParserCategory = Int
 
 -- * Token
 

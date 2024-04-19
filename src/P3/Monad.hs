@@ -3,6 +3,7 @@
 
 module P3.Monad
     ( ParserContext (..)
+    , parserCat
     , bindPow
     , ParserState (..)
     , stxStack
@@ -24,6 +25,8 @@ module P3.Monad
     , mkNode
     , ParserTable (..)
     , HasParserTable (..)
+    , ParserCatTable
+    , HasParserCatTable (..)
     , getLeadingParsers
     , getTrailingParsers,
     ) where
@@ -33,11 +36,13 @@ import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.IntMap              qualified as IM
 import Data.Map.Strict          qualified as M
 import P3.Types
 
-newtype ParserContext t = ParserContext
-    { _bindPow :: BindingPower
+data ParserContext t = ParserContext
+    { _parserCat :: ParserCategory
+    , _bindPow   :: BindingPower
     }
 
 makeLenses ''ParserContext
@@ -142,12 +147,24 @@ data ParserTable t m = ParserTable
 
 makeClassy ''ParserTable
 
-getLeadingParsers :: (MonadReader e m, HasParserTable e t m, Token t) => t -> ParserExceptM t m [Parser t m]
-getLeadingParsers tok = do
-    ps <- view leadingParsers
-    return $ concat $ M.lookup tok ps
+type ParserCatTable t m = IM.IntMap (ParserTable t m)
 
-getTrailingParsers :: (MonadReader e m, HasParserTable e t m, Token t) => t -> ParserExceptM t m [Parser t m]
+class HasParserCatTable e t m | e -> t where
+    getParserCatTable :: e -> ParserCatTable t m
+
+instance HasParserCatTable (ParserCatTable t m) t m where
+    getParserCatTable = id
+
+getLeadingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
+getLeadingParsers tok = do
+    cat <- view parserCat
+    mb_tbl <- liftParserM $ asks (IM.lookup cat . getParserCatTable)
+    let mb_ps = view leadingParsers <$> mb_tbl
+    return $ concat $ M.lookup tok =<< mb_ps
+
+getTrailingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
 getTrailingParsers tok = do
-    ps <- view trailingParsers
-    return $ concat $ M.lookup tok ps
+    cat <- view parserCat
+    mb_tbl <- liftParserM $ asks (IM.lookup cat . getParserCatTable)
+    let mb_ps = view trailingParsers <$> mb_tbl
+    return $ concat $ M.lookup tok =<< mb_ps

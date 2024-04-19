@@ -30,19 +30,19 @@ longestMatch parsers = do
 tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> LogicT (ParserExceptM t m) (ParserState t)
 tryParsers parsers c s = foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
 
-parseLeading :: (Token t, MonadReader e m, HasParserTable e t m) => ParserM t m ()
+parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseLeading = do
     tok <- nextToken
-    parsers <- liftParserM $ getLeadingParsers tok
+    parsers <- getLeadingParsers tok
     longestMatch parsers `catchError` (\_ -> mkAtom tok)
     parseTrailing
 
-parseTrailing :: (Token t, MonadReader e m, HasParserTable e t m) => ParserM t m ()
+parseTrailing :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseTrailing = do
     tok <- peekToken
-    parsers <- liftParserM $ getTrailingParsers tok
+    parsers <- getTrailingParsers tok
     longestMatch parsers
     `catchError` (\_ -> return ())
 
-parserTop :: (Token t, MonadReader e m, HasParserTable e t m) => Parser t m
+parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m
 parserTop = execParserM parseLeading

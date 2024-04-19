@@ -6,12 +6,12 @@ module P3.Utils
 
 import Control.Lens.Combinators
 import Control.Monad.Except
+import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
 import P3.Combinators
 import P3.Init
 import P3.Monad
 import P3.Types
-import Control.Monad.Reader.Class
 
 -- * MixfixOp
 
@@ -31,7 +31,7 @@ data MixfixOp t = MixfixOp
     }
     deriving (Show, Lift)
 
-parseOpers :: (Token t, MonadReader e m, HasParserTable e t m) => [Oper t] -> ParserM t m ()
+parseOpers :: (Token t, MonadReader e m, HasParserCatTable e t m) => [Oper t] -> ParserM t m ()
 parseOpers opers = forM_ opers $ \case
     Operator t -> matchToken (t ==)
     Operand bp -> withBindPow bp parseLeading

@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module P3.Example1 (spec) where
+module P3.Example1 (specEx1) where
 
 import Control.Monad.Reader
 import P3.Combinators
@@ -43,9 +43,9 @@ parseStrings inp = case runReader (unParserTestM (runParser parserTop inp)) pars
     Left err  -> fail $ show err
     Right stx -> return $ show stx
 
-spec :: SpecWith ()
-spec = do
-    describe "prefix parser test" $ do
+specEx1 :: SpecWith ()
+specEx1 = do
+    describe "Token is just a string" $ do
         it "-3" $ do
             parseStrings ["-", "3"] `shouldReturn` "Neg [\"3\"]"
         it "(1 + 2) * 3" $ do

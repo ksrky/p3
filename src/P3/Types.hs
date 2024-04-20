@@ -30,7 +30,7 @@ class (Show t, Ord t) => Token t where
     tokenString = show
 
 instance Token String where
-    tokenString = id
+    tokenString = show
 
 instance Token T.Text where
     tokenString = T.unpack
@@ -48,6 +48,6 @@ data Syntax
 
 instance Show Syntax where
     show (Node (Name name) stxs) = name ++ " [" ++ L.intercalate ", " (map show stxs) ++ "]"
-    show (Atom str) = show str
+    show (Atom str) = str
 
 type SyntaxStack = [Syntax]

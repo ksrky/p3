@@ -14,6 +14,7 @@ module P3.Monad
     , ParserM
     , execParserM
     , liftParserM
+    , withParserCat
     , withBindPow
     , nextToken
     , nextToken_
@@ -76,6 +77,9 @@ liftParserM = lift . lift
 -- * Operations
 
 -- ** ParserContext
+
+withParserCat :: Monad m => ParserCategory -> ParserM t m a -> ParserM t m a
+withParserCat cat = local (parserCat .~ cat)
 
 withBindPow :: Monad m => BindingPower -> ParserM t m a -> ParserM t m a
 withBindPow bp = local (bindPow .~ bp)

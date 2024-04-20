@@ -125,10 +125,17 @@ test-suite p3-test
 
     other-modules:    P3.Example1
                       P3.Example1.TH
+                      P3.Example2
+                      P3.Example2.Lexer
+                      P3.Example2.TH
 
     -- Test dependencies.
     build-depends:    base ^>=4.17.2.1,
                       p3,
+                      array,
                       hspec,
+                      hspec-discover,
                       mtl,
                       template-haskell
+    
+    build-tool-depends: hspec-discover:hspec-discover

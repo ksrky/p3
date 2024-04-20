@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import Test.Hspec
 import P3.Example1

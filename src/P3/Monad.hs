@@ -19,6 +19,7 @@ module P3.Monad
     , nextToken_
     , peekToken
     , matchToken
+    , matchToken_
     , pushSyntax
     , popSyntax
     , mkAtom
@@ -105,13 +106,17 @@ peekToken = do
         x : _ -> return x
         []    -> throwError TokenEOF
 
--- | Match the next token with a predicate.
-matchToken :: Monad m => (t -> Bool) -> ParserM t m ()
+-- | Match the next token with a predicate. Returns the token if matched.
+matchToken :: Monad m => (t -> Bool) -> ParserM t m t
 matchToken p = do
     tok <- nextToken
     if p tok
-        then return ()
+        then return tok
         else throwError TokenUnmatched
+
+-- | `matchToken` but discard the token.
+matchToken_ :: Monad m => (t -> Bool) -> ParserM t m ()
+matchToken_ p = void $ matchToken p
 
 -- ** Syntax
 

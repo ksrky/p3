@@ -122,13 +122,30 @@ test-suite p3-test
     hs-source-dirs:   test
 
     -- The entrypoint to the test suite.
-    main-is:          Spec.hs
+    main-is:          Main.hs
 
     other-modules:    P3.Example1
                       P3.Example1.TH
                       P3.Example2
                       P3.Example2.Lexer
                       P3.Example2.TH
+
+    default-extensions: FunctionalDependencies
+                        ImportQualifiedPost
+                        LambdaCase
+                        PatternSynonyms
+                        OverloadedStrings
+                        TupleSections
+
+    ghc-options:    -Wall
+                    -Wcompat
+                    -Widentities
+                    -Wincomplete-record-updates
+                    -Wincomplete-uni-patterns
+                    -Wmissing-export-lists
+                    -Wmissing-home-modules
+                    -Wpartial-fields
+                    -Wredundant-constraints
 
     -- Test dependencies.
     build-depends:    base ^>=4.17.2.1,

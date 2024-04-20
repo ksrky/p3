@@ -14,9 +14,9 @@ import P3.Types qualified
 $digit = 0-9
 $alpha = [a-zA-Z]
 $greek = [α-ωΑ-Ω]
-@atom_start = $alpha | $greek | [℀-⅏] | _
-@atom_rest = @atom_start | $digit
-@atom = @atom_start @atom_rest*
+@letter_start = $alpha | $greek | [℀-⅏] | _
+@letter_rest = @letter_start | $digit
+@letter = @letter_start @letter_rest*
 @surrounder_start = [\(\[\{]
 @surrounder_end = [\)\]\}]
 @surrounder = @surrounder_start+ | @surrounder_end+
@@ -26,14 +26,14 @@ tokens :-
 
 $white+                        ;
 "--".*                         ;
-@atom                          { \s -> Atom s }
+@letter                        { \s -> Letter s }
 @surrounder                    { \s -> Symbol s }
 @symbol                        { \s -> Symbol s }
 $digit+                        { \s -> Number (read s) }
 
 {
 data Token
-    = Atom String
+    = Letter String
     | Symbol String
     | Number Int
     deriving (Eq, Ord, Show, Lift)

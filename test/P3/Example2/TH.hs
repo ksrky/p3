@@ -57,7 +57,7 @@ pMixfixOp = MixfixOp <$> (skipSpaces *> pName) <*> pOpers
 pMixfixOps :: ReadP [MixfixOp Lexer.Token]
 pMixfixOps = some (skipSpaces >> pMixfixOp) <* skipSpaces
 
-mkQuasiQuoter :: (Show a, Lift a) => ReadP a -> QuasiQuoter
+mkQuasiQuoter :: Lift a => ReadP a -> QuasiQuoter
 mkQuasiQuoter p =
     QuasiQuoter
         { quoteExp = \s -> case readP_to_S p s of

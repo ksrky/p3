@@ -33,7 +33,7 @@ data MixfixOp t = MixfixOp
 
 parseOpers :: (Token t, MonadReader e m, HasParserCatTable e t m) => [Oper t] -> ParserM t m ()
 parseOpers opers = forM_ opers $ \case
-    Operator t -> matchToken (t ==)
+    Operator t -> matchToken_ (t ==)
     Operand cat bp -> withParserCat cat $ withBindPow bp parseLeading
 
 instance MkParserEntry (MixfixOp t) t where

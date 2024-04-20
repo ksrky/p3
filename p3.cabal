@@ -70,7 +70,8 @@ library
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    default-extensions: ImportQualifiedPost
+    default-extensions: FunctionalDependencies
+                        ImportQualifiedPost
                         LambdaCase
                         PatternSynonyms
                         OverloadedStrings
@@ -133,6 +134,7 @@ test-suite p3-test
     build-depends:    base ^>=4.17.2.1,
                       p3,
                       array,
+                      containers,
                       hspec,
                       hspec-discover,
                       mtl,

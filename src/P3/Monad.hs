@@ -1,5 +1,4 @@
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module P3.Monad
     ( ParserContext (..)

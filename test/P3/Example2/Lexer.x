@@ -14,13 +14,13 @@ import P3.Types qualified
 $digit = 0-9
 $alpha = [a-zA-Z]
 $greek = [α-ωΑ-Ω]
-@atom_start = $alpha | $greek | _
+@atom_start = $alpha | $greek | [℀-⅏] | _
 @atom_rest = @atom_start | $digit
 @atom = @atom_start @atom_rest*
 @surrounder_start = [\(\[\{]
 @surrounder_end = [\)\]\}]
 @surrounder = @surrounder_start+ | @surrounder_end+
-@symbol = [\!-\'\*-\/\:-\@\\\^-\`\|\~]+
+@symbol = [\!-\'\*-\/\:-\@\\\^-\`\|\~¡-ÿ←-⇿∀-⋿⟰-⟿⤀-⥿⦀-⧿⨀-⫿]+
 
 tokens :-
 

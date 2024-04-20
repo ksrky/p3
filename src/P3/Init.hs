@@ -1,5 +1,3 @@
-{-# LANGUAGE FunctionalDependencies #-}
-
 module P3.Init
     ( runParser
     , ParserEntry

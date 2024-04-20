@@ -17,25 +17,33 @@ newtype ParserTestM a = ParserTestM
 parserTbl :: ParserCatTable Token ParserTestM
 parserTbl = initParserCatTable
     [ initParserTable $ map mkParserEntry [syntaxs|
-        Neg         "-" :75
-        Paren       "(" :0 ")"
+        Neg         "-" exp:75
+        Paren       "(" exp:0 ")"
         Unit        "(" ")"
-        Pair        :11 "," :10
-        Or          :30 "||" :31
-        And         :35 "&&" :36
-        Eq          :50 "==" :50
-        Ne          :50 "/=" :50
-        Lt          :50 "<" :50
-        Le          :50 "<=" :50
-        Gt          :50 ">" :50
-        Ge          :50 ">=" :50
-        Add         :65 "+" :66
-        Sub         :65 "-" :66
-        Mul         :70 "*" :71
-        Div         :70 "/" :71
-        Subscript   :100 "[" :0 "]"
-        IfThenElse  "if" :30 "then" :30 "else" :30
-        IfThen      "if" :30 "then" :30
+        Pair        exp:11 "," exp:10
+        Or          exp:30 "||" exp:31
+        And         exp:35 "&&" exp:36
+        Eq          exp:50 "==" exp:50
+        Ne          exp:50 "/=" exp:50
+        Ne          exp:50 "≠" exp:50
+        Lt          exp:50 "<" exp:50
+        Le          exp:50 "≦" exp:50
+        Gt          exp:50 ">" exp:50
+        Ge          exp:50 ">=" exp:50
+        Ge          exp:50 "≧" exp:50
+        Add         exp:65 "+" exp:66
+        Sub         exp:65 "-" exp:66
+        Mul         exp:70 "*" exp:71
+        Div         exp:70 "/" exp:71
+        Subscript   exp:100 "[" exp:0 "]"
+        IfThenElse  "if" exp:30 "then" exp:30 "else" exp:30
+        IfThen      "if" exp:30 "then" exp:30
+        |]
+    , initParserTable $ map mkParserEntry [syntaxs|
+        TyArrow      typ:21 "->" typ:20
+        TyArrow      typ:21 "→" typ:20
+        TyProd       typ:31 "×" typ:30
+        TyList       "[" typ:0 "]"
         |]
     ]
 
@@ -71,4 +79,3 @@ specEx2 = do
             parseInput "()" `shouldReturn` "Unit []"
         it "a[1][2]" $ do
             parseInput "a[1][2]" `shouldReturn` "Subscript [Subscript [Atom \"a\", Number 1], Number 2]"
-

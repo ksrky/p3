@@ -36,7 +36,11 @@ parserTbl = initParserCatTable
         IfThenElse  "if" :30 "then" :30 "else" :30
         IfThen      "if" :30 "then" :30
         |]
+        ++ [pTerminal]
     ]
+
+pTerminal :: ParserEntry String ParserTestM
+pTerminal = TerminalEntry $ execParserM . mkAtom
 
 parseStrings :: [String] -> IO String
 parseStrings inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of

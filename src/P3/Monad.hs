@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia     #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module P3.Monad
@@ -29,7 +30,9 @@ module P3.Monad
     , ParserCatTable
     , HasParserCatTable (..)
     , getLeadingParsers
-    , getTrailingParsers,
+    , getTrailingParsers
+    , getTerminalParsers
+    , getUnindexedParsers
     ) where
 
 import Control.Lens.Combinators
@@ -39,6 +42,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.IntMap              qualified as IM
 import Data.Map.Strict          qualified as M
+import Data.Semigroup
 import P3.Types
 
 data ParserContext t = ParserContext
@@ -61,6 +65,10 @@ data Exception
     | TokenUnmatched
     | TokenEOF
     deriving (Eq, Show)
+    deriving Semigroup via Last Exception
+
+instance Monoid Exception where
+    mempty = NoMatchParsers
 
 type ParserExceptM t m = ExceptT Exception m
 
@@ -149,8 +157,10 @@ mkNode name = mkNode' []
 -- ** Parser Table
 
 data ParserTable t m = ParserTable
-    { _leadingParsers  :: M.Map t [Parser t m]
-    , _trailingParsers :: M.Map t [Parser t m]
+    { _leadingParsers   :: M.Map t [Parser t m]
+    , _trailingParsers  :: M.Map t [Parser t m]
+    , _terminalParsers  :: [t -> Parser t m]
+    , _unindexedParsers :: [Parser t m]
     }
 
 makeClassy ''ParserTable
@@ -163,16 +173,25 @@ class HasParserCatTable e t m | e -> t where
 instance HasParserCatTable (ParserCatTable t m) t m where
     getParserCatTable = id
 
+getParserTable :: (MonadReader e m, HasParserCatTable e t m) => ParserM t m (Maybe (ParserTable t m))
+getParserTable = do
+    cat <- view parserCat
+    liftParserM $ asks (IM.lookup cat . getParserCatTable)
+
 getLeadingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
 getLeadingParsers tok = do
-    cat <- view parserCat
-    mb_tbl <- liftParserM $ asks (IM.lookup cat . getParserCatTable)
+    mb_tbl <- getParserTable
     let mb_ps = view leadingParsers <$> mb_tbl
     return $ concat $ M.lookup tok =<< mb_ps
 
 getTrailingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
 getTrailingParsers tok = do
-    cat <- view parserCat
-    mb_tbl <- liftParserM $ asks (IM.lookup cat . getParserCatTable)
+    mb_tbl <- getParserTable
     let mb_ps = view trailingParsers <$> mb_tbl
     return $ concat $ M.lookup tok =<< mb_ps
+
+getTerminalParsers :: (MonadReader e m, HasParserCatTable e t m) => t -> ParserM t m [Parser t m]
+getTerminalParsers tok = concatMap (\tab -> view terminalParsers tab ?? tok) <$> getParserTable
+
+getUnindexedParsers :: (MonadReader e m, HasParserCatTable e t m) => ParserM t m [Parser t m]
+getUnindexedParsers = concatMap (view unindexedParsers) <$> getParserTable

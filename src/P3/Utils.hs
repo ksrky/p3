@@ -42,7 +42,7 @@ instance MkParserEntry (MixfixOp t) t where
             parser = execParserM $ do
                 parseOpers opers
                 mkNode name arity
-        Left (t0, parser)
+        LeadingEntry t0 parser
     mkParserEntry MixfixOp{name, opers = Operand _ bp0 : Operator t1 : opers} = do
         let arity = 1 + length (filter (\case Operand{} -> True; _ -> False) opers)
             parser = execParserM $ do
@@ -52,5 +52,5 @@ instance MkParserEntry (MixfixOp t) t where
                 parseOpers opers
                 mkNode name arity
                 parseTrailing
-        Right (t1, parser)
+        TrailingEntry t1 parser
     mkParserEntry _ = error "invalid mixfix op"

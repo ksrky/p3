@@ -33,15 +33,15 @@ tryParsers parsers c s = foldr (\p -> (lift (p c s) `catchError` const empty <|>
 parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseLeading = do
     tok <- nextToken
-    parsers <- getLeadingParsers tok
-    longestMatch parsers `catchError` (\_ -> mkAtom tok)
+    (longestMatch =<< getLeadingParsers tok)
+        `catchError` (\_ -> longestMatch =<< getTerminalParsers tok)
     parseTrailing
 
 parseTrailing :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseTrailing = do
     tok <- peekToken
-    parsers <- getTrailingParsers tok
-    longestMatch parsers
+    (longestMatch =<< getTrailingParsers tok)
+        `catchError` (\_ -> longestMatch =<< getUnindexedParsers)
     `catchError` (\_ -> return ())
 
 parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m

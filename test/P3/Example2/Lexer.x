@@ -14,13 +14,14 @@ import P3.Types qualified
 $digit = 0-9
 $alpha = [a-zA-Z]
 $greek = [α-ωΑ-Ω]
-@letter_start = $alpha | $greek | [℀-⅏] | _
+$letter_like = [℀-⅏]
+@letter_start = $alpha | $greek | letter_like | _
 @letter_rest = @letter_start | $digit
 @letter = @letter_start @letter_rest*
-@surrounder_start = [\(\[\{]
-@surrounder_end = [\)\]\}]
+@surrounder_start = [\(\[\{⟦⟨⟪⟬⟮]
+@surrounder_end = [\)\]\}⟧⟩⟫⟭⟯]
 @surrounder = @surrounder_start+ | @surrounder_end+
-@symbol = [\!-\'\*-\/\:-\@\\\^-\`\|\~¡-ÿ←-⇿∀-⋿⟰-⟿⤀-⥿⦀-⧿⨀-⫿]+
+@symbol = [\!-\'\*-\/\:-\@\\\^-\`\|\~¡-ÿ←-⇿∀-⋿⟀-⟥⟰-⟿⤀-⥿⦀-⧿⨀-⫿]+
 
 tokens :-
 
@@ -36,7 +37,12 @@ data Token
     = Letter String
     | Symbol String
     | Number Int
-    deriving (Eq, Ord, Show, Lift)
+    deriving (Eq, Ord, Lift)
+
+instance Show Token where
+    show (Letter s) = show s
+    show (Symbol s) = show s
+    show (Number n) = show n
 
 instance P3.Types.Token Token
 

@@ -17,6 +17,7 @@ parserCatIds :: M.Map String ParserCategory
 parserCatIds = M.fromList
     [ ("exp", 0)
     , ("typ", 1)
+    , ("var", 2)
     ]
 
 pName :: ReadP Name
@@ -40,10 +41,8 @@ pParserCat = do
         Nothing -> fail "unknown parser category"
 
 pOperand :: ReadP (Oper Lexer.Token)
-pOperand = do
-    cat <- option 0 pParserCat
-    _ <- char ':'
-    Operand cat <$> pInt
+pOperand = Operand <$> option 0 pParserCat <* char ':' <*> pInt
+    -- +++ (Operand <$> option 0 pParserCat <*> pure 0)
 
 pOper :: ReadP (Oper Lexer.Token)
 pOper = pOperator +++ pOperand
@@ -52,7 +51,7 @@ pOpers :: ReadP [Oper Lexer.Token]
 pOpers = some (skipSpaces >> pOper)
 
 pMixfixOp :: ReadP (MixfixOp Lexer.Token)
-pMixfixOp = MixfixOp <$> (skipSpaces *> pName) <*> pOpers
+pMixfixOp = MixfixOp <$> (skipSpaces *> pName) <*> pOpers <* skipSpaces
 
 pMixfixOps :: ReadP [MixfixOp Lexer.Token]
 pMixfixOps = some (skipSpaces >> pMixfixOp) <* skipSpaces

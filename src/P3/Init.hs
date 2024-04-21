@@ -1,6 +1,6 @@
 module P3.Init
     ( runParser
-    , ParserEntry
+    , ParserEntry (..)
     , MkParserEntry (..)
     , insertParserEntry
     , initParserTable
@@ -11,7 +11,7 @@ import Control.Lens.At
 import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader.Class
-import Data.Either
+import Control.Monad.Writer
 import Data.IntMap                qualified as IM
 import Data.List                  qualified as L
 import Data.Map.Strict            qualified as M
@@ -24,36 +24,51 @@ initParserContext = ParserContext
     , _bindPow = 0
     }
 
-mkParserState :: [t] -> ParserState t
-mkParserState toks = ParserState
+initParserState :: [t] -> ParserState t
+initParserState toks = ParserState
     { _stxStack = []
     , _tokens = toks
     }
 
 runParser :: Monad m => Parser t m -> [t] -> m (Either Exception Syntax)
-runParser parser toks = runExceptT (parser initParserContext (mkParserState toks)) >>= \case
+runParser parser toks = runExceptT (parser initParserContext (initParserState toks)) >>= \case
     Left err -> return $ Left err
     Right s -> return $ Right $ head $ s ^. stxStack
 
-type ParserEntry t m = Either (t, Parser t m) (t, Parser t m)
+data ParserEntry t m
+    = LeadingEntry t (Parser t m)
+    | TrailingEntry t (Parser t m)
+    | TerminalEntry (t -> Parser t m)
+    | UnindexedEntry (Parser t m)
+
+partitionEntries :: [ParserEntry t m] -> ([(t, Parser t m)], [(t, Parser t m)], [t -> Parser t m], [Parser t m])
+partitionEntries pes = execWriter $ forM pes $ \case
+    LeadingEntry t p -> tell ([(t, p)], [], [], [])
+    TrailingEntry t p -> tell ([], [(t, p)], [], [])
+    TerminalEntry p -> tell ([], [], [p], [])
+    UnindexedEntry p -> tell ([], [], [], [p])
 
 class MkParserEntry a t | a -> t where
     mkParserEntry :: (Token t, MonadReader e m, HasParserCatTable e t m) => a -> ParserEntry t m
 
 insertParserEntry :: Token t => ParserEntry t m -> ParserTable t m -> ParserTable t m
-insertParserEntry (Left (tok, p)) = leadingParsers . at tok %~ \case
+insertParserEntry (LeadingEntry tok p) = leadingParsers . at tok %~ \case
     Nothing -> Just [p]
     Just ps -> Just $ p : ps
-insertParserEntry (Right (tok, p)) = trailingParsers . at tok %~ \case
+insertParserEntry (TrailingEntry tok p) = trailingParsers . at tok %~ \case
     Nothing -> Just [p]
     Just ps -> Just $ p : ps
+insertParserEntry (TerminalEntry p) = terminalParsers %~ (p :)
+insertParserEntry (UnindexedEntry p) = unindexedParsers %~ (p :)
 
 initParserTable :: Token t => [ParserEntry t m] -> ParserTable t m
 initParserTable entries = do
-    let (lps, tps) = partitionEithers entries
+    let (lps, tps, tmps, ups) = partitionEntries entries
     ParserTable
-        { _leadingParsers = M.fromList $ groupParsers lps
-        , _trailingParsers = M.fromList $ groupParsers tps
+        { _leadingParsers   = M.fromList $ groupParsers lps
+        , _trailingParsers  = M.fromList $ groupParsers tps
+        , _terminalParsers  = tmps
+        , _unindexedParsers = ups
         }
 
 groupParsers :: forall t m. Token t => [(t, Parser t m)] -> [(t, [Parser t m])]

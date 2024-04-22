@@ -10,6 +10,7 @@ module P3.Init
 import Control.Lens.At
 import Control.Lens.Operators
 import Control.Monad.Except
+import Control.Monad.Logic
 import Control.Monad.Reader.Class
 import Control.Monad.Writer
 import Data.IntMap                qualified as IM
@@ -28,12 +29,17 @@ initParserState :: [t] -> ParserState t
 initParserState toks = ParserState
     { _stxStack = []
     , _tokens = toks
+    , _position = 0
     }
 
-runParser :: Monad m => Parser t m -> [t] -> m (Either Exception Syntax)
-runParser parser toks = runExceptT (parser initParserContext (initParserState toks)) >>= \case
-    Left err -> return $ Left err
-    Right s -> return $ Right $ head $ s ^. stxStack
+runParser :: Monad m => Parser t m -> [t] -> m (Either String Syntax)
+runParser parser toks = runExceptT (observeManyT 1 (parser initParserContext (initParserState toks))) <&> \case
+    Left err -> Left $ show err
+    Right [s]
+        | [stx] <- s ^. stxStack -> Right stx
+        | otherwise -> Left "runParser: invalid sytax stack"
+    Right [] -> Left "runParser: no result"
+    Right _ ->  Left "runParser: multiple result"
 
 data ParserEntry t m
     = LeadingEntry t (Parser t m)

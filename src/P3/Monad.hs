@@ -1,4 +1,3 @@
-{-# LANGUAGE DerivingVia     #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module P3.Monad
@@ -8,8 +7,9 @@ module P3.Monad
     , ParserState (..)
     , stxStack
     , tokens
+    , position
     , Exception (..)
-    , ParserExceptM
+    , ParserInnerM
     , Parser
     , ParserM
     , execParserM
@@ -21,6 +21,7 @@ module P3.Monad
     , peekToken
     , matchToken
     , matchToken_
+    , eof
     , pushSyntax
     , popSyntax
     , mkAtom
@@ -38,11 +39,11 @@ module P3.Monad
 import Control.Lens.Combinators
 import Control.Lens.Operators
 import Control.Monad.Except
+import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.IntMap              qualified as IM
-import Data.Map.Strict          qualified as M
-import Data.Semigroup
+import Data.Map.Strict          qualified as M 
 import P3.Types
 
 data ParserContext t = ParserContext
@@ -55,6 +56,7 @@ makeLenses ''ParserContext
 data ParserState t = ParserState
     { _stxStack :: SyntaxStack
     , _tokens   :: [t]
+    , _position :: Int
     }
 
 makeLenses ''ParserState
@@ -65,31 +67,27 @@ data Exception
     | TokenUnmatched
     | TokenEOF
     deriving (Eq, Show)
-    deriving Semigroup via Last Exception
 
-instance Monoid Exception where
-    mempty = NoMatchParsers
+type ParserInnerM t m = LogicT (ExceptT Exception m)
 
-type ParserExceptM t m = ExceptT Exception m
+type Parser t m = ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
 
-type Parser t m = ParserContext t -> ParserState t -> ParserExceptM t m (ParserState t)
+type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) (ParserInnerM t m))
 
-type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) (ParserExceptM t m))
-
-execParserM :: Monad m => ParserM t m a -> ParserContext t -> ParserState t -> ParserExceptM t m (ParserState t)
+execParserM :: ParserM t m a -> ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
 execParserM m = execStateT . runReaderT m
 
-liftParserM :: (Monad m) => ParserExceptM t m a -> ParserM t m a
+liftParserM :: ParserInnerM t m a -> ParserM t m a
 liftParserM = lift . lift
 
 -- * Operations
 
 -- ** ParserContext
 
-withParserCat :: Monad m => ParserCategory -> ParserM t m a -> ParserM t m a
+withParserCat :: ParserCategory -> ParserM t m a -> ParserM t m a
 withParserCat cat = local (parserCat .~ cat)
 
-withBindPow :: Monad m => BindingPower -> ParserM t m a -> ParserM t m a
+withBindPow :: BindingPower -> ParserM t m a -> ParserM t m a
 withBindPow bp = local (bindPow .~ bp)
 
 -- ** Tokens
@@ -99,7 +97,7 @@ nextToken :: Monad m => ParserM t m t
 nextToken = do
     toks <- use tokens
     case toks of
-        x : xs -> tokens .= xs >> return x
+        x : xs -> tokens .= xs >> position %= (+ 1) >> return x
         []     -> throwError TokenEOF
 
 -- | `nextToken` but discard the token.
@@ -122,6 +120,14 @@ matchToken p = do
         then return tok
         else throwError TokenUnmatched
 
+-- | Check if there's no more token.
+eof :: ParserM t m ()
+eof = do 
+    toks <- use tokens
+    case toks of
+        [] -> return ()
+        _  -> mzero
+
 -- | `matchToken` but discard the token.
 matchToken_ :: Monad m => (t -> Bool) -> ParserM t m ()
 matchToken_ p = void $ matchToken p
@@ -129,21 +135,21 @@ matchToken_ p = void $ matchToken p
 -- ** Syntax
 
 -- | Push a syntax node to the syntax stack.
-pushSyntax :: Monad m => Syntax -> ParserM t m ()
+pushSyntax :: Syntax -> ParserM t m ()
 pushSyntax stx = stxStack %= (stx :)
 
 -- | Pop a syntax node from the syntax stack.
-popSyntax :: Monad m => ParserM t m Syntax
+popSyntax :: ParserM t m Syntax
 popSyntax = do
     stx <- use $ stxStack . to head
     stxStack %= tail
     return stx
 
 -- | Push `Atom` to the syntax stack.
-mkAtom :: (Token t, Monad m) => t -> ParserM t m ()
+mkAtom :: Token t => t -> ParserM t m ()
 mkAtom = pushSyntax . Atom . tokenString
 
--- | Push a node to the syntax stack.
+-- | Push `Node` to the syntax stack.
 mkNode :: Monad m => Name -> Int -> ParserM t m ()
 mkNode name = mkNode' []
   where

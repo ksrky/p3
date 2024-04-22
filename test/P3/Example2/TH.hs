@@ -41,8 +41,8 @@ pParserCat = do
         Nothing -> fail "unknown parser category"
 
 pOperand :: ReadP (Oper Lexer.Token)
-pOperand = Operand <$> option 0 pParserCat <* char ':' <*> pInt
-    -- +++ (Operand <$> option 0 pParserCat <*> pure 0)
+pOperand = (Operand <$> option 0 pParserCat <* char ':' <*> pInt)
+    <++ (Operand <$> pParserCat <*> pure 0)
 
 pOper :: ReadP (Oper Lexer.Token)
 pOper = pOperator +++ pOperand

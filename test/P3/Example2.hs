@@ -18,6 +18,7 @@ newtype ParserTestM a = ParserTestM
 
 parserTbl :: ParserCatTable Token ParserTestM
 parserTbl = initParserCatTable
+      -- exp
     [ initParserTable $ map mkParserEntry [syntaxs|
         Neg         "-" exp:75
         Paren       "(" exp:0 ")"
@@ -40,36 +41,38 @@ parserTbl = initParserCatTable
         Subscript   exp:100 "[" exp:0 "]"
         If          "if" exp:30 "then" exp:30 "else" exp:30
         If          "if" exp:30 "then" exp:30
-        Lam         "\" var:0 "->" exp:10
-        Lam         "λ" var:0 "→" exp:10
-        Let         "let" var:0 "=" exp:10 "in" exp:10
+        Lam         "\" var "->" exp:10
+        Lam         "λ" var "→" exp:10
+        Let         "let" var "=" exp:10 "in" exp:10
         |]
-        ++ [pTerminal]
+        ++ [pTerminal, pApp]
+      -- typ
     , initParserTable $ map mkParserEntry [syntaxs|
         TyArrow     typ:21 "->" typ:20
         TyArrow     typ:21 "→" typ:20
         TyProd      typ:31 "×" typ:30
         TyList      "[" typ:0 "]"
-        TyForall    "∀" var:0 "." typ:0
+        TyForall    "∀" var "." typ:10
         |]
+      -- var
     , initParserTable [pVar]
     ]
 
 pTerminal :: ParserEntry Token ParserTestM
-pTerminal = do
-    let parser tok = execParserM $ case tok of
-            Number _ -> mkAtom tok >> mkNode (Name "Int") 1
-            Letter _ -> mkAtom tok >> mkNode (Name "Var") 1
-            Symbol _ -> empty
-    TerminalEntry parser
-
+pTerminal = TerminalEntry $ \tok -> execParserM $ case tok of
+    Number _ -> mkAtom tok >> mkNode (Name "Int") 1
+    Letter _ -> mkAtom tok >> mkNode (Name "Var") 1
+    Symbol _ -> empty
 
 pVar :: ParserEntry Token ParserTestM
-pVar = do
-    let parser tok = execParserM $ case tok of
-            Letter _ -> mkAtom tok
-            _        -> empty
-    TerminalEntry parser
+pVar = TerminalEntry $ \tok -> execParserM $ case tok of
+    Letter _ -> mkAtom tok
+    _        -> empty
+
+pApp :: ParserEntry Token ParserTestM
+pApp = UnindexedEntry $ execParserM $ do
+    l <- withBindPow 100 $ some parseLeading
+    mkNode (Name "App") (length l + 1)
 
 {-
 instead of using declarative style to define parser, we can write, for example:
@@ -84,14 +87,6 @@ pLam = do
     [LeadingEntry (Symbol "\\") parser, LeadingEntry (Symbol "λ") parser]
 @
 -}
-
--- TODO: need reserved keywords
-{- pApp :: ParserEntry Token ParserTestM
-pApp = do
-    let parser = execParserM $ do
-            l <- withBindPow 100 $ some parseLeading
-            mkNode (Name "App") (length l + 1)
-    UnindexedEntry parser -}
 
 parseTokens :: [Token] -> IO String
 parseTokens inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of
@@ -131,3 +126,5 @@ specEx2 = do
             parseInput "λ x → x + 1" `shouldReturn` "Lam [\"x\", Add [Var [\"x\"], Int [1]]]"
         it "let x = 5 * 2 in x * 10" $ do
             parseInput "let x = 5 * 2 in x * 10" `shouldReturn` "Let [\"x\", Mul [Int [5], Int [2]], Mul [Var [\"x\"], Int [10]]]"
+        it "f x" $ do
+            pending -- parseInput "f x" `shouldReturn` "App [Var [\"f\"], Var [\"x\"]]"

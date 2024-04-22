@@ -9,7 +9,6 @@ module P3.Combinators
 
 import Control.Applicative
 import Control.Lens.Combinators
-import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Logic
 import Control.Monad.Reader.Class
@@ -22,13 +21,13 @@ longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
 longestMatch parsers = do
     ctx <- ask
     st <- get
-    sts <- liftParserM $ observeAllT $ tryParsers parsers ctx st
-    when (null sts) $ throwError NoMatchParsers
-    let st' = head $ L.sortOn (^. tokens . to length) sts
-    put st'
+    sts <- liftParserM $ lift $ observeAllT $ tryParsers parsers ctx st
+    case L.sortOn (negate . view position) sts of
+        []        -> throwError NoMatchParsers
+        (st' : _) -> put st'
 
-tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> LogicT (ParserExceptM t m) (ParserState t)
-tryParsers parsers c s = foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
+tryParsers :: Monad m => [Parser t m] -> Parser t m
+tryParsers parsers c s = foldr (\p -> (p c s `catchError` const empty <|>)) empty parsers
 
 parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseLeading = do
@@ -45,4 +44,4 @@ parseTrailing = do
     `catchError` (\_ -> return ())
 
 parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m
-parserTop = execParserM parseLeading
+parserTop = execParserM $ parseLeading <* eof

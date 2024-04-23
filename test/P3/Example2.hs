@@ -3,14 +3,17 @@
 module P3.Example2 (specEx2) where
 
 import Control.Applicative
+import Control.Lens.Combinators
+import Control.Monad.Except
 import Control.Monad.Reader
 import P3.Combinators
 import P3.Example2.Lexer
 import P3.Example2.TH
 import P3.Init
 import P3.Monad
-import P3.Types             (Name (..))
+import P3.Types                 (Name (..))
 import Test.Hspec
+import Control.Lens.Operators
 
 newtype ParserTestM a = ParserTestM
     {unParserTestM :: Reader (ParserCatTable Token ParserTestM) a}
@@ -61,8 +64,11 @@ parserTbl = initParserCatTable
 pTerminal :: ParserEntry Token ParserTestM
 pTerminal = TerminalEntry $ \tok -> execParserM $ case tok of
     Number _ -> mkAtom tok >> mkNode (Name "Int") 1
-    Letter _ -> mkAtom tok >> mkNode (Name "Var") 1
-    Symbol _ -> empty
+    Letter _ -> do
+        reserveds <- view reservedWords
+        if tok `elem` reserveds then empty
+        else mkAtom tok >> mkNode (Name "Var") 1
+    Symbol _ -> throwError NoMatchParsers
 
 pVar :: ParserEntry Token ParserTestM
 pVar = TerminalEntry $ \tok -> execParserM $ case tok of
@@ -71,7 +77,7 @@ pVar = TerminalEntry $ \tok -> execParserM $ case tok of
 
 pApp :: ParserEntry Token ParserTestM
 pApp = UnindexedEntry $ execParserM $ do
-    l <- withBindPow 100 $ some parseLeading
+    l <- local (bindPow .~ 100) $ some parseLeading
     mkNode (Name "App") (length l + 1)
 
 {-
@@ -90,7 +96,7 @@ pLam = do
 
 parseTokens :: [Token] -> IO String
 parseTokens inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of
-    Left err  -> fail $ show err
+    Left msg  -> fail $ show msg
     Right stx -> return $ show stx
 
 parseInput :: String -> IO String
@@ -127,4 +133,4 @@ specEx2 = do
         it "let x = 5 * 2 in x * 10" $ do
             parseInput "let x = 5 * 2 in x * 10" `shouldReturn` "Let [\"x\", Mul [Int [5], Int [2]], Mul [Var [\"x\"], Int [10]]]"
         it "f x" $ do
-            pending -- parseInput "f x" `shouldReturn` "App [Var [\"f\"], Var [\"x\"]]"
+            parseInput "f x" `shouldReturn` "App [Var [\"f\"], Var [\"x\"]]"

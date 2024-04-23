@@ -21,13 +21,13 @@ longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
 longestMatch parsers = do
     ctx <- ask
     st <- get
-    sts <- liftParserM $ lift $ observeAllT $ tryParsers parsers ctx st
+    sts <- liftParserM $ tryParsers parsers ctx st
     case L.sortOn (negate . view position) sts of
         []        -> throwError NoMatchParsers
-        (st' : _) -> put st'
+        st' : _ -> put st'
 
-tryParsers :: Monad m => [Parser t m] -> Parser t m
-tryParsers parsers c s = foldr (\p -> (p c s `catchError` const empty <|>)) empty parsers
+tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> ParserInnerM t m [ParserState t]
+tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
 
 parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseLeading = do

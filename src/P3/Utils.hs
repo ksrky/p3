@@ -12,6 +12,7 @@ import P3.Combinators
 import P3.Init
 import P3.Monad
 import P3.Types
+import Control.Lens.Operators
 
 -- * MixfixOp
 
@@ -34,22 +35,24 @@ data MixfixOp t = MixfixOp
 parseOpers :: (Token t, MonadReader e m, HasParserCatTable e t m) => [Oper t] -> ParserM t m ()
 parseOpers opers = forM_ opers $ \case
     Operator t -> matchToken_ (t ==)
-    Operand cat bp -> withParserCat cat $ withBindPow bp parseLeading
+    Operand cat bp -> local (parserCat .~ cat) $ local (bindPow .~ bp) parseLeading
 
 instance MkParserEntry (MixfixOp t) t where
     mkParserEntry MixfixOp{name, opers = Operator t0 : opers} = do
-        let arity = length $ filter (\case Operand{} -> True; _ -> False) opers
+        let ators = [t | Operator t <- opers]
+            arity = length [() | Operand{} <- opers]
             parser = execParserM $ do
-                parseOpers opers
+                local (reservedWords <>~ ators) $ parseOpers opers
                 mkNode name arity
         LeadingEntry t0 parser
     mkParserEntry MixfixOp{name, opers = Operand _ bp0 : Operator t1 : opers} = do
-        let arity = 1 + length (filter (\case Operand{} -> True; _ -> False) opers)
+        let ators = [t | Operator t <- opers]
+            arity = 1 + length [() | Operand{} <- opers]
             parser = execParserM $ do
                 bp <- view bindPow
                 when (bp0 < bp) $ throwError LowerBindingPower
                 nextToken_
-                parseOpers opers
+                local (reservedWords <>~ ators) $ parseOpers opers
                 mkNode name arity
                 parseTrailing
         TrailingEntry t1 parser

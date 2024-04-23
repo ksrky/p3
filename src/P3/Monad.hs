@@ -1,9 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DerivingVia #-}
 
 module P3.Monad
     ( ParserContext (..)
     , parserCat
     , bindPow
+    , reservedWords
     , ParserState (..)
     , stxStack
     , tokens
@@ -14,8 +16,6 @@ module P3.Monad
     , ParserM
     , execParserM
     , liftParserM
-    , withParserCat
-    , withBindPow
     , nextToken
     , nextToken_
     , peekToken
@@ -39,16 +39,17 @@ module P3.Monad
 import Control.Lens.Combinators
 import Control.Lens.Operators
 import Control.Monad.Except
-import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.IntMap              qualified as IM
-import Data.Map.Strict          qualified as M 
+import Data.Map.Strict          qualified as M
 import P3.Types
+import Data.Semigroup
 
 data ParserContext t = ParserContext
-    { _parserCat :: ParserCategory
-    , _bindPow   :: BindingPower
+    { _parserCat     :: ParserCategory
+    , _bindPow       :: BindingPower
+    , _reservedWords :: [t]
     }
 
 makeLenses ''ParserContext
@@ -67,28 +68,24 @@ data Exception
     | TokenUnmatched
     | TokenEOF
     deriving (Eq, Show)
+    deriving Semigroup via Last Exception
 
-type ParserInnerM t m = LogicT (ExceptT Exception m)
+instance Monoid Exception where
+    mempty = NoMatchParsers
+
+type ParserInnerM t m = ExceptT Exception m
 
 type Parser t m = ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
 
 type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) (ParserInnerM t m))
 
-execParserM :: ParserM t m a -> ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
+execParserM :: Monad m => ParserM t m a -> ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
 execParserM m = execStateT . runReaderT m
 
-liftParserM :: ParserInnerM t m a -> ParserM t m a
+liftParserM :: Monad m => ParserInnerM t m a -> ParserM t m a
 liftParserM = lift . lift
 
 -- * Operations
-
--- ** ParserContext
-
-withParserCat :: ParserCategory -> ParserM t m a -> ParserM t m a
-withParserCat cat = local (parserCat .~ cat)
-
-withBindPow :: BindingPower -> ParserM t m a -> ParserM t m a
-withBindPow bp = local (bindPow .~ bp)
 
 -- ** Tokens
 
@@ -121,8 +118,8 @@ matchToken p = do
         else throwError TokenUnmatched
 
 -- | Check if there's no more token.
-eof :: ParserM t m ()
-eof = do 
+eof :: Monad m => ParserM t m ()
+eof = do
     toks <- use tokens
     case toks of
         [] -> return ()
@@ -135,18 +132,18 @@ matchToken_ p = void $ matchToken p
 -- ** Syntax
 
 -- | Push a syntax node to the syntax stack.
-pushSyntax :: Syntax -> ParserM t m ()
+pushSyntax :: Monad m => Syntax -> ParserM t m ()
 pushSyntax stx = stxStack %= (stx :)
 
 -- | Pop a syntax node from the syntax stack.
-popSyntax :: ParserM t m Syntax
+popSyntax :: Monad m => ParserM t m Syntax
 popSyntax = do
     stx <- use $ stxStack . to head
     stxStack %= tail
     return stx
 
 -- | Push `Atom` to the syntax stack.
-mkAtom :: Token t => t -> ParserM t m ()
+mkAtom :: (Token t, Monad m) => t -> ParserM t m ()
 mkAtom = pushSyntax . Atom . tokenString
 
 -- | Push `Node` to the syntax stack.

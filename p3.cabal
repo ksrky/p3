@@ -154,6 +154,7 @@ test-suite p3-test
                       containers,
                       hspec,
                       hspec-discover,
+                      lens,
                       mtl,
                       template-haskell
     

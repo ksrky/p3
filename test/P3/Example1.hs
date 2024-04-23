@@ -44,7 +44,7 @@ pTerminal = TerminalEntry $ execParserM . mkAtom
 
 parseStrings :: [String] -> IO String
 parseStrings inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of
-    Left err  -> fail $ show err
+    Left msg  -> fail $ show msg
     Right stx -> return $ show stx
 
 specEx1 :: SpecWith ()

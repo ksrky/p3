@@ -10,7 +10,6 @@ module P3.Init
 import Control.Lens.At
 import Control.Lens.Operators
 import Control.Monad.Except
-import Control.Monad.Logic
 import Control.Monad.Reader.Class
 import Control.Monad.Writer
 import Data.IntMap                qualified as IM
@@ -23,6 +22,7 @@ initParserContext :: ParserContext t
 initParserContext = ParserContext
     { _parserCat = 0
     , _bindPow = 0
+    , _reservedWords = []
     }
 
 initParserState :: [t] -> ParserState t
@@ -33,13 +33,11 @@ initParserState toks = ParserState
     }
 
 runParser :: Monad m => Parser t m -> [t] -> m (Either String Syntax)
-runParser parser toks = runExceptT (observeManyT 1 (parser initParserContext (initParserState toks))) <&> \case
-    Left err -> Left $ show err
-    Right [s]
+runParser parser toks = runExceptT (parser initParserContext (initParserState toks)) <&> \case
+    Left e -> Left $ show e
+    Right s
         | [stx] <- s ^. stxStack -> Right stx
         | otherwise -> Left "runParser: invalid sytax stack"
-    Right [] -> Left "runParser: no result"
-    Right _ ->  Left "runParser: multiple result"
 
 data ParserEntry t m
     = LeadingEntry t (Parser t m)
@@ -69,12 +67,12 @@ insertParserEntry (UnindexedEntry p) = unindexedParsers %~ (p :)
 
 initParserTable :: Token t => [ParserEntry t m] -> ParserTable t m
 initParserTable entries = do
-    let (lps, tps, tmps, ups) = partitionEntries entries
+    let (ldps, trps, tmps, uips) = partitionEntries entries
     ParserTable
-        { _leadingParsers   = M.fromList $ groupParsers lps
-        , _trailingParsers  = M.fromList $ groupParsers tps
+        { _leadingParsers   = M.fromList $ groupParsers ldps
+        , _trailingParsers  = M.fromList $ groupParsers trps
         , _terminalParsers  = tmps
-        , _unindexedParsers = ups
+        , _unindexedParsers = uips
         }
 
 groupParsers :: forall t m. Token t => [(t, Parser t m)] -> [(t, [Parser t m])]

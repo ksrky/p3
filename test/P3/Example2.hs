@@ -4,6 +4,7 @@ module P3.Example2 (specEx2) where
 
 import Control.Applicative
 import Control.Lens.Combinators
+import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader
 import P3.Combinators
@@ -13,7 +14,6 @@ import P3.Init
 import P3.Monad
 import P3.Types                 (Name (..))
 import Test.Hspec
-import Control.Lens.Operators
 
 newtype ParserTestM a = ParserTestM
     {unParserTestM :: Reader (ParserCatTable Token ParserTestM) a}
@@ -79,6 +79,7 @@ pApp :: ParserEntry Token ParserTestM
 pApp = UnindexedEntry $ execParserM $ do
     l <- local (bindPow .~ 100) $ some parseLeading
     mkNode (Name "App") (length l + 1)
+    parseTrailing
 
 {-
 instead of using declarative style to define parser, we can write, for example:
@@ -134,3 +135,8 @@ specEx2 = do
             parseInput "let x = 5 * 2 in x * 10" `shouldReturn` "Let [\"x\", Mul [Int [5], Int [2]], Mul [Var [\"x\"], Int [10]]]"
         it "f x" $ do
             parseInput "f x" `shouldReturn` "App [Var [\"f\"], Var [\"x\"]]"
+        it "f x + 3" $ do
+            parseInput "f x + 3" `shouldReturn` "Add [App [Var [\"f\"], Var [\"x\"]], Int [3]]"
+        it "let double = \\x -> x * 2 in double 5" $ do
+            parseInput "let double = \\x -> x * 2 in double 5"
+                `shouldReturn` "Let [\"double\", Lam [\"x\", Mul [Var [\"x\"], Int [2]]], App [Var [\"double\"], Int [5]]]"

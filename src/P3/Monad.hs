@@ -22,8 +22,6 @@ module P3.Monad
     , matchToken
     , matchToken_
     , eof
-    , pushSyntax
-    , popSyntax
     , mkAtom
     , mkNode
     , ParserTable (..)

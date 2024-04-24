@@ -23,7 +23,7 @@ longestMatch parsers = do
     st <- get
     sts <- liftParserM $ tryParsers parsers ctx st
     case L.sortOn (negate . view position) sts of
-        []        -> throwError NoMatchParsers
+        []      -> throwError NoMatchParsers
         st' : _ -> put st'
 
 tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> ParserInnerM t m [ParserState t]

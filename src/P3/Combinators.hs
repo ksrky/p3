@@ -1,8 +1,5 @@
 module P3.Combinators
-    ( longestMatch
-    , mkAtom
-    , mkNode
-    , parseLeading
+    ( parseLeading
     , parseTrailing
     , parserTop
     ) where

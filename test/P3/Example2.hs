@@ -65,7 +65,7 @@ pTerminal :: ParserEntry Token ParserTestM
 pTerminal = TerminalEntry $ \tok -> execParserM $ case tok of
     Number _ -> mkAtom tok >> mkNode (Name "Int") 1
     Letter _ -> do
-        reserveds <- view reservedWords
+        reserveds <- view reservedToks
         if tok `elem` reserveds then empty
         else mkAtom tok >> mkNode (Name "Var") 1
     Symbol _ -> throwError NoMatchParsers
@@ -80,20 +80,6 @@ pApp = UnindexedEntry $ execParserM $ do
     l <- local (bindPow .~ 100) $ some parseLeading
     mkNode (Name "App") (length l + 1)
     parseTrailing
-
-{-
-instead of using declarative style to define parser, we can write, for example:
-@
-pLam :: [ParserEntry Token ParserTestM]
-pLam = do
-    let parser = execParserM $ do
-            mkAtom =<< matchToken (\case Letter{} -> True; _ -> False)
-            matchToken_ (`elem` [Symbol "->", Symbol "→"])
-            withBindPow 10 parseLeading
-            mkNode (Name "Lam") 2
-    [LeadingEntry (Symbol "\\") parser, LeadingEntry (Symbol "λ") parser]
-@
--}
 
 parseTokens :: [Token] -> IO String
 parseTokens inp = case runReader (unParserTestM (runParser parserTop inp)) parserTbl of

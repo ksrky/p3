@@ -3,13 +3,9 @@
 
 module P3.Monad
     ( ParserContext (..)
-    , parserCat
-    , bindPow
-    , reservedWords
+    , HasParserContext (..)
     , ParserState (..)
-    , stxStack
-    , tokens
-    , position
+    , HasParserState (..)
     , Exception (..)
     , ParserInnerM
     , Parser
@@ -20,7 +16,6 @@ module P3.Monad
     , nextToken_
     , peekToken
     , matchToken
-    , matchToken_
     , eof
     , mkAtom
     , mkNode
@@ -44,21 +39,26 @@ import Data.Map.Strict          qualified as M
 import P3.Types
 import Data.Semigroup
 
+-- | Reader context for parser.
 data ParserContext t = ParserContext
     { _parserCat     :: ParserCategory
     , _bindPow       :: BindingPower
-    , _reservedWords :: [t]
+      -- | Scoped reserved keywords.
+    , _reservedToks :: [t]
     }
 
-makeLenses ''ParserContext
+makeClassy ''ParserContext
 
 data ParserState t = ParserState
-    { _stxStack :: SyntaxStack
+    { -- | Stored parse results.
+      _stxStack :: SyntaxStack
+      -- | Input token stream.
     , _tokens   :: [t]
+      -- | Position in the token stream.
     , _position :: Int
     }
 
-makeLenses ''ParserState
+makeClassy ''ParserState
 
 data Exception
     = NoMatchParsers
@@ -107,12 +107,12 @@ peekToken = do
         x : _ -> return x
         []    -> throwError TokenEOF
 
--- | Match the next token with a predicate. Returns the token if matched.
-matchToken :: Monad m => (t -> Bool) -> ParserM t m t
+-- | Match the next token with a predicate.
+matchToken :: Monad m => (t -> Bool) -> ParserM t m ()
 matchToken p = do
     tok <- nextToken
     if p tok
-        then return tok
+        then return ()
         else throwError TokenUnmatched
 
 -- | Check if there's no more token.
@@ -122,10 +122,6 @@ eof = do
     case toks of
         [] -> return ()
         _  -> mzero
-
--- | `matchToken` but discard the token.
-matchToken_ :: Monad m => (t -> Bool) -> ParserM t m ()
-matchToken_ p = void $ matchToken p
 
 -- ** Syntax
 

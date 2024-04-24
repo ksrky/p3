@@ -20,7 +20,7 @@ newtype Name = Name String
 -- | Each operand has a binding power.
 type BindingPower = Int
 
--- | Parser category Id.
+-- | Parser category is like nonterminal symbols of a parser generator.
 type ParserCategory = Int
 
 -- * Token

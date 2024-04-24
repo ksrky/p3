@@ -1,7 +1,9 @@
+{-|
+Constructors useful for building `ParserEntry`
+-}
 module P3.Utils
     ( Oper (..)
     , MixfixOp (..)
-    , parseOpers
     ) where
 
 import Control.Lens.Combinators
@@ -34,7 +36,7 @@ data MixfixOp t = MixfixOp
 
 parseOpers :: (Token t, MonadReader e m, HasParserCatTable e t m) => [Oper t] -> ParserM t m ()
 parseOpers opers = forM_ opers $ \case
-    Operator t -> matchToken_ (t ==)
+    Operator t -> matchToken (t ==)
     Operand cat bp -> local (parserCat .~ cat) $ local (bindPow .~ bp) parseLeading
 
 instance MkParserEntry (MixfixOp t) t where
@@ -42,7 +44,7 @@ instance MkParserEntry (MixfixOp t) t where
         let ators = [t | Operator t <- opers]
             arity = length [() | Operand{} <- opers]
             parser = execParserM $ do
-                local (reservedWords <>~ ators) $ parseOpers opers
+                local (reservedToks <>~ ators) $ parseOpers opers
                 mkNode name arity
         LeadingEntry t0 parser
     mkParserEntry MixfixOp{name, opers = Operand _ bp0 : Operator t1 : opers} = do
@@ -52,8 +54,9 @@ instance MkParserEntry (MixfixOp t) t where
                 bp <- view bindPow
                 when (bp0 < bp) $ throwError LowerBindingPower
                 nextToken_
-                local (reservedWords <>~ ators) $ parseOpers opers
+                local (reservedToks <>~ ators) $ parseOpers opers
                 mkNode name arity
                 parseTrailing
         TrailingEntry t1 parser
-    mkParserEntry _ = error "invalid mixfix op"
+    mkParserEntry _ = error "invalid mixfix op: an operator does not appear at the first or second position.\n\
+                            \You may use a unindexed parser instead."

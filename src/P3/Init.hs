@@ -22,7 +22,7 @@ initParserContext :: ParserContext t
 initParserContext = ParserContext
     { _parserCat = 0
     , _bindPow = 0
-    , _reservedWords = []
+    , _reservedToks = []
     }
 
 initParserState :: [t] -> ParserState t

@@ -7,7 +7,6 @@ import Control.Lens.Combinators
 import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader
-import P3.Combinators
 import P3.Example2.Lexer
 import P3.Example2.TH
 import P3.Init
@@ -47,6 +46,7 @@ parserTbl = initParserCatTable
         Lam         "\" var "->" exp:10
         Lam         "λ" var "→" exp:10
         Let         "let" var "=" exp:10 "in" exp:10
+        ListCompr   "[" exp:10 "|" var "<-" exp:10 "]"
         |]
         ++ [pTerminal, pApp]
       -- typ
@@ -77,7 +77,9 @@ pVar = TerminalEntry $ \tok -> execParserM $ case tok of
 
 pApp :: ParserEntry Token ParserTestM
 pApp = UnindexedEntry $ execParserM $ do
-    l <- local (bindPow .~ 100) $ some parseLeading
+    bp <- view bindPow
+    when (bp >= 100) empty
+    l <- some $ local (bindPow .~ 100) parseLeading
     mkNode (Name "App") (length l + 1)
     parseTrailing
 
@@ -121,8 +123,13 @@ specEx2 = do
             parseInput "let x = 5 * 2 in x * 10" `shouldReturn` "Let [\"x\", Mul [Int [5], Int [2]], Mul [Var [\"x\"], Int [10]]]"
         it "f x" $ do
             parseInput "f x" `shouldReturn` "App [Var [\"f\"], Var [\"x\"]]"
+        it "f x 1" $ do
+            parseInput "f x 1" `shouldReturn` "App [Var [\"f\"], Var [\"x\"], Int [1]]"
         it "f x + 3" $ do
             parseInput "f x + 3" `shouldReturn` "Add [App [Var [\"f\"], Var [\"x\"]], Int [3]]"
         it "let double = \\x -> x * 2 in double 5" $ do
             parseInput "let double = \\x -> x * 2 in double 5"
                 `shouldReturn` "Let [\"double\", Lam [\"x\", Mul [Var [\"x\"], Int [2]]], App [Var [\"double\"], Int [5]]]"
+        it "[ x * 2 | x <- xs ] == map double xs" $ do
+            parseInput "[ x * 2 | x <- xs ] == map double xs"
+                `shouldReturn` "Eq [ListCompr [Mul [Var [\"x\"], Int [2]], \"x\", Var [\"xs\"]], App [Var [\"map\"], Var [\"double\"], Var [\"xs\"]]]"

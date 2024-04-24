@@ -3,7 +3,6 @@
 module P3.Example1 (specEx1) where
 
 import Control.Monad.Reader
-import P3.Combinators
 import P3.Example1.TH
 import P3.Init
 import P3.Monad

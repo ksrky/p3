@@ -1,5 +1,5 @@
+{-# LANGUAGE DerivingVia     #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DerivingVia #-}
 
 module P3.Monad
     ( ParserContext (..)
@@ -7,7 +7,6 @@ module P3.Monad
     , ParserState (..)
     , HasParserState (..)
     , Exception (..)
-    , ParserInnerM
     , Parser
     , ParserM
     , execParserM
@@ -23,26 +22,28 @@ module P3.Monad
     , HasParserTable (..)
     , ParserCatTable
     , HasParserCatTable (..)
-    , getLeadingParsers
-    , getTrailingParsers
-    , getTerminalParsers
-    , getUnindexedParsers
+    , parseLeading
+    , parseTrailing
+    , parserTop
     ) where
 
+import Control.Applicative
 import Control.Lens.Combinators
 import Control.Lens.Operators
 import Control.Monad.Except
+import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.IntMap              qualified as IM
+import Data.List                qualified as L
 import Data.Map.Strict          qualified as M
-import P3.Types
 import Data.Semigroup
+import P3.Types
 
 -- | Reader context for parser.
 data ParserContext t = ParserContext
-    { _parserCat     :: ParserCategory
-    , _bindPow       :: BindingPower
+    { _parserCat    :: ParserCategory
+    , _bindPow      :: BindingPower
       -- | Scoped reserved keywords.
     , _reservedToks :: [t]
     }
@@ -192,3 +193,34 @@ getTerminalParsers tok = concatMap (\tab -> view terminalParsers tab ?? tok) <$>
 
 getUnindexedParsers :: (MonadReader e m, HasParserCatTable e t m) => ParserM t m [Parser t m]
 getUnindexedParsers = concatMap (view unindexedParsers) <$> getParserTable
+
+-- * Combinators
+
+longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
+longestMatch parsers = do
+    ctx <- ask
+    st <- get
+    sts <- liftParserM $ tryParsers parsers ctx st
+    case L.sortOn (negate . view position) sts of
+        []      -> throwError NoMatchParsers
+        st' : _ -> put st'
+
+tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> ParserInnerM t m [ParserState t]
+tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
+
+parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
+parseLeading = do
+    tok <- nextToken
+    (longestMatch =<< getLeadingParsers tok)
+        `catchError` (\_ -> longestMatch =<< getTerminalParsers tok)
+    parseTrailing
+
+parseTrailing :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
+parseTrailing = do
+    tok <- peekToken
+    (longestMatch =<< getTrailingParsers tok)
+        `catchError` (\_ -> longestMatch =<< getUnindexedParsers)
+    `catchError` (\_ -> return ())
+
+parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m
+parserTop = execParserM $ parseLeading <* eof

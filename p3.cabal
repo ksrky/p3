@@ -59,8 +59,7 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  P3.Combinators
-                      P3.Init
+    exposed-modules:  P3.Init
                       P3.Monad
                       P3.Types
                       P3.Utils

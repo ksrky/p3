@@ -7,14 +7,13 @@ module P3.Utils
     ) where
 
 import Control.Lens.Combinators
+import Control.Lens.Operators
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
-import P3.Combinators
 import P3.Init
 import P3.Monad
 import P3.Types
-import Control.Lens.Operators
 
 -- * MixfixOp
 
@@ -28,6 +27,8 @@ instance (Show t) => Show (Oper t) where
     show (Operator t)     = show t
     show (Operand cat bp) = show cat ++ ":" ++ show bp
 
+-- | Mixfix operator represents almost any kind of operators.
+-- For example, you can also represent Haskell's unit value `()` as a mixfix operator.
 data MixfixOp t = MixfixOp
     { name  :: Name
     , opers :: [Oper t]

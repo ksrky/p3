@@ -8,6 +8,7 @@ module P3.Utils
 
 import Control.Lens.Combinators
 import Control.Lens.Operators
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)

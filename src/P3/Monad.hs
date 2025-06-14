@@ -30,6 +30,7 @@ module P3.Monad
 import Control.Applicative
 import Control.Lens.Combinators
 import Control.Lens.Operators
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Logic
 import Control.Monad.Reader
@@ -133,9 +134,12 @@ pushSyntax stx = stxStack %= (stx :)
 -- | Pop a syntax node from the syntax stack.
 popSyntax :: Monad m => ParserM t m Syntax
 popSyntax = do
-    stx <- use $ stxStack . to head
-    stxStack %= tail
-    return stx
+    stxs <- use stxStack
+    case stxs of
+        [] -> throwError TokenEOF
+        stx : stxs' -> do
+            stxStack .= stxs'
+            return stx
 
 -- | Push `Atom` to the syntax stack.
 mkAtom :: (Token t, Monad m) => t -> ParserM t m ()
@@ -157,8 +161,6 @@ mkNode name = mkNode' []
 data ParserTable t m = ParserTable
     { _leadingParsers   :: M.Map t [Parser t m]
     , _trailingParsers  :: M.Map t [Parser t m]
-    , _terminalParsers  :: [t -> Parser t m]
-    , _unindexedParsers :: [Parser t m]
     }
 
 makeClassy ''ParserTable
@@ -188,12 +190,6 @@ getTrailingParsers tok = do
     let mb_ps = view trailingParsers <$> mb_tbl
     return $ concat $ M.lookup tok =<< mb_ps
 
-getTerminalParsers :: (MonadReader e m, HasParserCatTable e t m) => t -> ParserM t m [Parser t m]
-getTerminalParsers tok = concatMap (\tab -> view terminalParsers tab ?? tok) <$> getParserTable
-
-getUnindexedParsers :: (MonadReader e m, HasParserCatTable e t m) => ParserM t m [Parser t m]
-getUnindexedParsers = concatMap (view unindexedParsers) <$> getParserTable
-
 -- * Combinators
 
 longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
@@ -210,17 +206,16 @@ tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` c
 
 parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
 parseLeading = do
-    tok <- nextToken
-    (longestMatch =<< getLeadingParsers tok)
-        `catchError` (\_ -> longestMatch =<< getTerminalParsers tok)
+    longestMatch =<< getLeadingParsers =<< nextToken
     parseTrailing
 
 parseTrailing :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
-parseTrailing = do
-    tok <- peekToken
-    (longestMatch =<< getTrailingParsers tok)
-        `catchError` (\_ -> longestMatch =<< getUnindexedParsers)
-    `catchError` (\_ -> return ())
+parseTrailing = withNoMatchParser $ longestMatch =<< getTrailingParsers =<< peekToken
+
+withNoMatchParser :: MonadReader e m => ParserM t m () -> ParserM t m ()
+withNoMatchParser m = catchError m $ \case
+    NoMatchParsers -> return ()
+    e -> throwError e
 
 parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m
 parserTop = execParserM $ parseLeading <* eof

@@ -87,7 +87,7 @@ library
                     -Wredundant-constraints
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.1,
+    build-depends:    base ^>=4.19.2.0,
                       containers,
                       lens,
                       logict,
@@ -147,7 +147,7 @@ test-suite p3-test
                     -Wredundant-constraints
 
     -- Test dependencies.
-    build-depends:    base ^>=4.17.2.1,
+    build-depends:    base ^>=4.19.2.0,
                       p3,
                       array,
                       containers,

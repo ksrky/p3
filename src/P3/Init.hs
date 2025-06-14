@@ -9,6 +9,7 @@ module P3.Init
 
 import Control.Lens.At
 import Control.Lens.Operators
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Control.Monad.Writer
@@ -42,15 +43,11 @@ runParser parser toks = runExceptT (parser initParserContext (initParserState to
 data ParserEntry t m
     = LeadingEntry t (Parser t m)
     | TrailingEntry t (Parser t m)
-    | TerminalEntry (t -> Parser t m)
-    | UnindexedEntry (Parser t m)
 
-partitionEntries :: [ParserEntry t m] -> ([(t, Parser t m)], [(t, Parser t m)], [t -> Parser t m], [Parser t m])
+partitionEntries :: [ParserEntry t m] -> ([(t, Parser t m)], [(t, Parser t m)])
 partitionEntries pes = execWriter $ forM pes $ \case
-    LeadingEntry t p -> tell ([(t, p)], [], [], [])
-    TrailingEntry t p -> tell ([], [(t, p)], [], [])
-    TerminalEntry p -> tell ([], [], [p], [])
-    UnindexedEntry p -> tell ([], [], [], [p])
+    LeadingEntry t p -> tell ([(t, p)], [])
+    TrailingEntry t p -> tell ([], [(t, p)])
 
 class MkParserEntry a t | a -> t where
     mkParserEntry :: (Token t, MonadReader e m, HasParserCatTable e t m) => a -> ParserEntry t m
@@ -62,17 +59,13 @@ insertParserEntry (LeadingEntry tok p) = leadingParsers . at tok %~ \case
 insertParserEntry (TrailingEntry tok p) = trailingParsers . at tok %~ \case
     Nothing -> Just [p]
     Just ps -> Just $ p : ps
-insertParserEntry (TerminalEntry p) = terminalParsers %~ (p :)
-insertParserEntry (UnindexedEntry p) = unindexedParsers %~ (p :)
 
 initParserTable :: Token t => [ParserEntry t m] -> ParserTable t m
 initParserTable entries = do
-    let (ldps, trps, tmps, uips) = partitionEntries entries
+    let (ldps, trps) = partitionEntries entries
     ParserTable
         { _leadingParsers   = M.fromList $ groupParsers ldps
         , _trailingParsers  = M.fromList $ groupParsers trps
-        , _terminalParsers  = tmps
-        , _unindexedParsers = uips
         }
 
 groupParsers :: forall t m. Token t => [(t, Parser t m)] -> [(t, [Parser t m])]

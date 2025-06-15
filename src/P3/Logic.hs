@@ -1,0 +1,42 @@
+module P3.Logic
+    ( parseLeading
+    , parseTrailing
+    ) where
+
+import P3.Monad
+import P3.Types
+import Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Except
+import qualified Data.List as L
+import Control.Lens.Combinators
+import Control.Monad.Logic
+import P3.Combinators
+import Control.Applicative
+
+longestMatch :: [Parser t] -> ParserM t ()
+longestMatch parsers = do
+    ctx <- ask
+    st <- get
+    sts <- liftParserM $ tryParsers parsers ctx st
+    case L.sortOn (negate . view position) sts of
+        []      -> throwError NoMatchParsers
+        st' : _ -> put st'
+
+tryParsers :: [Parser t] -> ParserContext t -> ParserState t -> Except Exception [ParserState t]
+tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
+
+parseLeading :: Token t => ParserM t ()
+parseLeading = do
+    tok <- nextToken
+    (longestMatch =<< leadingParsersOf tok)
+        `catchError` \case
+            NoMatchParsers -> mkAtom tok
+            e -> throwError e
+    parseTrailing
+
+parseTrailing :: Token t => ParserM t ()
+parseTrailing = (longestMatch =<< trailingParsersOf =<< peekToken)
+    `catchError` \case
+        NoMatchParsers -> return ()
+        e -> throwError e

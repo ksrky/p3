@@ -2,8 +2,7 @@
 
 module P3.Types
     ( Name (..)
-    , BindingPower
-    , ParserCategory
+    , BindingPower (..)
     , Token (..)
     , Syntax (..)
     , SyntaxStack
@@ -18,10 +17,12 @@ newtype Name = Name String
     deriving (Eq, Show, Lift)
 
 -- | Each operand has a binding power.
-type BindingPower = Int
+newtype BindingPower = BindingPower Int
+    deriving (Eq, Ord, Show, Lift)
 
--- | Parser category is like nonterminal symbols of a parser generator.
-type ParserCategory = Int
+instance Bounded BindingPower where
+    minBound = BindingPower 0
+    maxBound = BindingPower 100
 
 -- * Token
 
@@ -38,16 +39,16 @@ instance Token T.Text where
 -- * Syntax
 
 -- | Generalized AST.
-data Syntax
+data Syntax t
     = -- | @Name@ corresponds to a data constructor of the AST
       -- and @[Syntax]@ is its field.
-      Node Name [Syntax]
+      Node Name [Syntax t]
     | -- | Identifier or literal.
-      Atom String
+      Atom t
     deriving (Eq)
 
-instance Show Syntax where
+instance Show t => Show (Syntax t) where
     show (Node (Name name) stxs) = name ++ " [" ++ L.intercalate ", " (map show stxs) ++ "]"
-    show (Atom str) = str
+    show (Atom t) = show t
 
-type SyntaxStack = [Syntax]
+type SyntaxStack t = [Syntax t]

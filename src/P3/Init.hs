@@ -1,29 +1,24 @@
 module P3.Init
     ( runParser
-    , ParserEntry (..)
-    , MkParserEntry (..)
-    , insertParserEntry
-    , initParserTable
-    , initParserCatTable
+    , insertLeadingParser
+    , insertTrailingParser
     ) where
 
 import Control.Lens.At
 import Control.Lens.Operators
-import Control.Monad
 import Control.Monad.Except
-import Control.Monad.Reader.Class
-import Control.Monad.Writer
-import Data.IntMap                qualified as IM
-import Data.List                  qualified as L
-import Data.Map.Strict            qualified as M
 import P3.Monad
 import P3.Types
+import qualified Data.Map.Strict as M
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext
-    { _parserCat = 0
-    , _bindPow = 0
-    , _reservedToks = []
+    { _bindingPower   = minBound
+    , _reservedTokens = []
+    , _parserTable    = ParserTable 
+        { _leadingParsers  = M.empty
+        , _trailingParsers = M.empty
+        }
     }
 
 initParserState :: [t] -> ParserState t
@@ -33,48 +28,19 @@ initParserState toks = ParserState
     , _position = 0
     }
 
-runParser :: Monad m => Parser t m -> [t] -> m (Either String Syntax)
-runParser parser toks = runExceptT (parser initParserContext (initParserState toks)) <&> \case
+runParser :: Parser t -> [t] -> Either String (Syntax t)
+runParser parser toks = case runExcept (parser initParserContext (initParserState toks)) of
     Left e -> Left $ show e
     Right s
         | [stx] <- s ^. stxStack -> Right stx
         | otherwise -> Left "runParser: invalid sytax stack"
 
-data ParserEntry t m
-    = LeadingEntry t (Parser t m)
-    | TrailingEntry t (Parser t m)
+consMaybe :: a -> Maybe [a] -> Maybe [a]
+consMaybe x Nothing = Just [x]
+consMaybe x (Just xs) = Just (x : xs)
 
-partitionEntries :: [ParserEntry t m] -> ([(t, Parser t m)], [(t, Parser t m)])
-partitionEntries pes = execWriter $ forM pes $ \case
-    LeadingEntry t p -> tell ([(t, p)], [])
-    TrailingEntry t p -> tell ([], [(t, p)])
+insertLeadingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
+insertLeadingParser t p = leadingParsers . at t %~ consMaybe p
 
-class MkParserEntry a t | a -> t where
-    mkParserEntry :: (Token t, MonadReader e m, HasParserCatTable e t m) => a -> ParserEntry t m
-
-insertParserEntry :: Token t => ParserEntry t m -> ParserTable t m -> ParserTable t m
-insertParserEntry (LeadingEntry tok p) = leadingParsers . at tok %~ \case
-    Nothing -> Just [p]
-    Just ps -> Just $ p : ps
-insertParserEntry (TrailingEntry tok p) = trailingParsers . at tok %~ \case
-    Nothing -> Just [p]
-    Just ps -> Just $ p : ps
-
-initParserTable :: Token t => [ParserEntry t m] -> ParserTable t m
-initParserTable entries = do
-    let (ldps, trps) = partitionEntries entries
-    ParserTable
-        { _leadingParsers   = M.fromList $ groupParsers ldps
-        , _trailingParsers  = M.fromList $ groupParsers trps
-        }
-
-groupParsers :: forall t m. Token t => [(t, Parser t m)] -> [(t, [Parser t m])]
-groupParsers = groupSnd . L.sortOn fst
-  where
-    groupSnd :: [(t, Parser t m)] -> [(t, [Parser t m])]
-    groupSnd [] = []
-    groupSnd ((k, v) : xs) = (k, v : map snd ys) : groupSnd zs
-        where (ys, zs) = span ((k ==) . fst) xs
-
-initParserCatTable :: [ParserTable t m] -> ParserCatTable t m
-initParserCatTable = IM.fromList . zip [0..]
+insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
+insertTrailingParser t p = trailingParsers . at t %~ consMaybe p

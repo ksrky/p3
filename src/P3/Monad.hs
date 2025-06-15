@@ -11,128 +11,85 @@ module P3.Monad
     , ParserM
     , execParserM
     , liftParserM
-    , nextToken
-    , nextToken_
-    , peekToken
-    , matchToken
-    , eof
     , mkAtom
     , mkNode
     , ParserTable (..)
-    , HasParserTable (..)
-    , ParserCatTable
-    , HasParserCatTable (..)
-    , parseLeading
-    , parseTrailing
-    , parserTop
+    , leadingParsers
+    , trailingParsers
+    , ParserSpec (..)
+    , leadingParsersOf
+    , trailingParsersOf
     ) where
 
-import Control.Applicative
 import Control.Lens.Combinators
 import Control.Lens.Operators
-import Control.Monad
 import Control.Monad.Except
-import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.IntMap              qualified as IM
-import Data.List                qualified as L
 import Data.Map.Strict          qualified as M
 import Data.Semigroup
 import P3.Types
 
 -- | Reader context for parser.
 data ParserContext t = ParserContext
-    { _parserCat    :: ParserCategory
-    , _bindPow      :: BindingPower
+    { _bindingPower   :: BindingPower
       -- | Scoped reserved keywords.
-    , _reservedToks :: [t]
+    , _reservedTokens :: [t]
+    , _parserTable    :: ParserTable t
     }
 
-makeClassy ''ParserContext
 
 data ParserState t = ParserState
     { -- | Stored parse results.
-      _stxStack :: SyntaxStack
+      _stxStack :: SyntaxStack t
       -- | Input token stream.
     , _tokens   :: [t]
       -- | Position in the token stream.
     , _position :: Int
     }
 
-makeClassy ''ParserState
-
 data Exception
     = NoMatchParsers
     | LowerBindingPower
     | TokenUnmatched
     | TokenEOF
+    | UnknownParserCategory
     deriving (Eq, Show)
     deriving Semigroup via Last Exception
 
 instance Monoid Exception where
     mempty = NoMatchParsers
 
-type ParserInnerM t m = ExceptT Exception m
+type Parser t = ParserContext t -> ParserState t -> Except Exception (ParserState t)
 
-type Parser t m = ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
+type ParserM t = ReaderT (ParserContext t) (StateT (ParserState t)  (Except Exception))
 
-type ParserM t m = ReaderT (ParserContext t) (StateT (ParserState t) (ParserInnerM t m))
-
-execParserM :: Monad m => ParserM t m a -> ParserContext t -> ParserState t -> ParserInnerM t m (ParserState t)
+execParserM :: ParserM t a -> ParserContext t -> ParserState t -> Except Exception (ParserState t)
 execParserM m = execStateT . runReaderT m
 
-liftParserM :: Monad m => ParserInnerM t m a -> ParserM t m a
+liftParserM :: Except Exception a -> ParserM t a
 liftParserM = lift . lift
 
--- * Operations
+data ParserTable t = ParserTable
+    { _leadingParsers  :: M.Map t [Parser t]
+    , _trailingParsers :: M.Map t [Parser t]
+    }
 
--- ** Tokens
+makeClassy ''ParserContext
+makeClassy ''ParserState
+makeLenses ''ParserTable
 
--- | Get the next token and consume it from the token stream.
-nextToken :: Monad m => ParserM t m t
-nextToken = do
-    toks <- use tokens
-    case toks of
-        x : xs -> tokens .= xs >> position %= (+ 1) >> return x
-        []     -> throwError TokenEOF
-
--- | `nextToken` but discard the token.
-nextToken_ :: Monad m => ParserM t m ()
-nextToken_ = void nextToken
-
--- | Get the next token without consuming it.
-peekToken :: Monad m => ParserM t m t
-peekToken = do
-    toks <- use tokens
-    case toks of
-        x : _ -> return x
-        []    -> throwError TokenEOF
-
--- | Match the next token with a predicate.
-matchToken :: Monad m => (t -> Bool) -> ParserM t m ()
-matchToken p = do
-    tok <- nextToken
-    if p tok
-        then return ()
-        else throwError TokenUnmatched
-
--- | Check if there's no more token.
-eof :: Monad m => ParserM t m ()
-eof = do
-    toks <- use tokens
-    case toks of
-        [] -> return ()
-        _  -> mzero
+class ParserSpec f where
+    insertParser :: Token t => f t -> ParserTable t -> ParserTable t
 
 -- ** Syntax
 
 -- | Push a syntax node to the syntax stack.
-pushSyntax :: Monad m => Syntax -> ParserM t m ()
+pushSyntax :: Syntax t -> ParserM t ()
 pushSyntax stx = stxStack %= (stx :)
 
 -- | Pop a syntax node from the syntax stack.
-popSyntax :: Monad m => ParserM t m Syntax
+popSyntax :: ParserM t (Syntax t)
 popSyntax = do
     stxs <- use stxStack
     case stxs of
@@ -142,14 +99,14 @@ popSyntax = do
             return stx
 
 -- | Push `Atom` to the syntax stack.
-mkAtom :: (Token t, Monad m) => t -> ParserM t m ()
-mkAtom = pushSyntax . Atom . tokenString
+mkAtom :: t -> ParserM t ()
+mkAtom = pushSyntax . Atom
 
 -- | Push `Node` to the syntax stack.
-mkNode :: Monad m => Name -> Int -> ParserM t m ()
+mkNode :: Name -> Int -> ParserM t ()
 mkNode name = mkNode' []
   where
-    mkNode' :: (Monad m) => [Syntax] -> Int -> ParserM t m ()
+    mkNode' :: [Syntax t] -> Int -> ParserM t ()
     mkNode' stxs n
         | n <= 0 = pushSyntax $ Node name stxs
         | otherwise = do
@@ -157,65 +114,10 @@ mkNode name = mkNode' []
             mkNode' (stx : stxs) (n - 1)
 
 -- ** Parser Table
+ 
 
-data ParserTable t m = ParserTable
-    { _leadingParsers   :: M.Map t [Parser t m]
-    , _trailingParsers  :: M.Map t [Parser t m]
-    }
+leadingParsersOf :: Token t => t -> ParserM t [Parser t]
+leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.lookup tok) 
 
-makeClassy ''ParserTable
-
-type ParserCatTable t m = IM.IntMap (ParserTable t m)
-
-class HasParserCatTable e t m | e -> t where
-    getParserCatTable :: e -> ParserCatTable t m
-
-instance HasParserCatTable (ParserCatTable t m) t m where
-    getParserCatTable = id
-
-getParserTable :: (MonadReader e m, HasParserCatTable e t m) => ParserM t m (Maybe (ParserTable t m))
-getParserTable = do
-    cat <- view parserCat
-    liftParserM $ asks (IM.lookup cat . getParserCatTable)
-
-getLeadingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
-getLeadingParsers tok = do
-    mb_tbl <- getParserTable
-    let mb_ps = view leadingParsers <$> mb_tbl
-    return $ concat $ M.lookup tok =<< mb_ps
-
-getTrailingParsers :: (MonadReader e m, HasParserCatTable e t m, Token t) => t -> ParserM t m [Parser t m]
-getTrailingParsers tok = do
-    mb_tbl <- getParserTable
-    let mb_ps = view trailingParsers <$> mb_tbl
-    return $ concat $ M.lookup tok =<< mb_ps
-
--- * Combinators
-
-longestMatch :: Monad m => [Parser t m] -> ParserM t m ()
-longestMatch parsers = do
-    ctx <- ask
-    st <- get
-    sts <- liftParserM $ tryParsers parsers ctx st
-    case L.sortOn (negate . view position) sts of
-        []      -> throwError NoMatchParsers
-        st' : _ -> put st'
-
-tryParsers :: Monad m => [Parser t m] -> ParserContext t -> ParserState t -> ParserInnerM t m [ParserState t]
-tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
-
-parseLeading :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
-parseLeading = do
-    longestMatch =<< getLeadingParsers =<< nextToken
-    parseTrailing
-
-parseTrailing :: (Token t, MonadReader e m, HasParserCatTable e t m) => ParserM t m ()
-parseTrailing = withNoMatchParser $ longestMatch =<< getTrailingParsers =<< peekToken
-
-withNoMatchParser :: MonadReader e m => ParserM t m () -> ParserM t m ()
-withNoMatchParser m = catchError m $ \case
-    NoMatchParsers -> return ()
-    e -> throwError e
-
-parserTop :: (Token t, MonadReader e m, HasParserCatTable e t m) => Parser t m
-parserTop = execParserM $ parseLeading <* eof
+trailingParsersOf :: Token t => t -> ParserM t [Parser t]
+trailingParsersOf tok = views parserTable $ views trailingParsers (concat . M.lookup tok)

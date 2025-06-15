@@ -7,9 +7,9 @@ module P3.Init
 import Control.Lens.At
 import Control.Lens.Operators
 import Control.Monad.Except
+import Data.Map.Strict qualified as M
 import P3.Monad
 import P3.Types
-import qualified Data.Map.Strict as M
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext

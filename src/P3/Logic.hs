@@ -3,16 +3,15 @@ module P3.Logic
     , parseTrailing
     ) where
 
-import P3.Monad
-import P3.Types
+import Control.Applicative
+import Control.Lens.Combinators
+import Control.Monad.Except
+import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Except
-import qualified Data.List as L
-import Control.Lens.Combinators
-import Control.Monad.Logic
-import P3.Combinators
-import Control.Applicative
+import Data.List qualified as L
+import P3.Monad
+import P3.Types
 
 longestMatch :: [Parser t] -> ParserM t ()
 longestMatch parsers = do

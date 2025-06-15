@@ -3,20 +3,22 @@
 
 module P3.Monad
     ( ParserContext (..)
-    , HasParserContext (..)
     , ParserState (..)
-    , HasParserState (..)
     , Exception (..)
     , Parser
     , ParserM
     , execParserM
     , liftParserM
+    , nextToken
+    , nextToken_
+    , peekToken
+    , matchToken
     , mkAtom
     , mkNode
     , ParserTable (..)
+    , HasParserState (..)
     , leadingParsers
     , trailingParsers
-    , ParserSpec (..)
     , leadingParsersOf
     , trailingParsersOf
     ) where
@@ -29,6 +31,7 @@ import Control.Monad.State
 import Data.Map.Strict          qualified as M
 import Data.Semigroup
 import P3.Types
+import Control.Monad
 
 -- | Reader context for parser.
 data ParserContext t = ParserContext
@@ -37,7 +40,6 @@ data ParserContext t = ParserContext
     , _reservedTokens :: [t]
     , _parserTable    :: ParserTable t
     }
-
 
 data ParserState t = ParserState
     { -- | Stored parse results.
@@ -79,8 +81,35 @@ makeClassy ''ParserContext
 makeClassy ''ParserState
 makeLenses ''ParserTable
 
-class ParserSpec f where
-    insertParser :: Token t => f t -> ParserTable t -> ParserTable t
+-- ** Token
+
+-- | Get the next token and consume it from the token stream.
+nextToken :: ParserM t t
+nextToken = do
+    toks <- use tokens
+    case toks of
+        x : xs -> tokens .= xs >> position %= (+ 1) >> return x
+        []     -> throwError TokenEOF
+
+-- | `nextToken` but discard the token.
+nextToken_ :: ParserM t ()
+nextToken_ = void nextToken
+
+-- | Get the next token without consuming it.
+peekToken :: ParserM t t
+peekToken = do
+    toks <- use tokens
+    case toks of
+        x : _ -> return x
+        []    -> throwError TokenEOF
+
+-- | Match the next token with a predicate.
+matchToken :: (t -> Bool) -> ParserM t ()
+matchToken p = do
+    tok <- nextToken
+    if p tok
+        then return ()
+        else throwError TokenUnmatched
 
 -- ** Syntax
 
@@ -115,7 +144,6 @@ mkNode name = mkNode' []
 
 -- ** Parser Table
  
-
 leadingParsersOf :: Token t => t -> ParserM t [Parser t]
 leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.lookup tok) 
 

@@ -18,7 +18,7 @@ newtype Name = Name String
 
 -- | Each operand has a binding power.
 newtype BindingPower = BindingPower Int
-    deriving (Eq, Ord, Show, Lift)
+    deriving (Eq, Ord, Show, Enum, Lift)
 
 instance Bounded BindingPower where
     minBound = BindingPower 0
@@ -40,10 +40,9 @@ instance Token T.Text where
 
 -- | Generalized AST.
 data Syntax t
-    = -- | @Name@ corresponds to a data constructor of the AST
-      -- and @[Syntax]@ is its field.
+    = -- | @Name@ corresponds to a data constructor of the AST and @[Syntax t]@ is its field.
       Node Name [Syntax t]
-    | -- | Identifier or literal.
+    | -- | Token @t@.
       Atom t
     deriving (Eq)
 

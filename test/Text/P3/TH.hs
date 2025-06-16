@@ -1,4 +1,4 @@
-module P3.TH
+module Text.P3.TH
     ( syntax
     , syntaxs
     ) where
@@ -7,9 +7,9 @@ import Control.Applicative          hiding (optional)
 import Data.Char
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax   (Lift (lift))
-import P3.OperatorParser
-import P3.Types
 import Text.ParserCombinators.ReadP
+import Text.P3.OperatorParser
+import Text.P3.Types
 
 pName :: ReadP Name
 pName = Name <$> ((:) <$> satisfy isAlpha <*> munch1 isAlphaNum)

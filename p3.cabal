@@ -59,11 +59,11 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  P3.Combinators
-                      P3.Logic
-                      P3.Monad
-                      P3.Types
-                      P3.OperatorParser
+    exposed-modules:  Text.P3.Combinators
+                      Text.P3.Logic
+                      Text.P3.Monad
+                      Text.P3.Types
+                      Text.P3.OperatorParser
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -124,7 +124,7 @@ test-suite p3-test
     -- The entrypoint to the test suite.
     main-is:          Main.hs
 
-    other-modules:    P3.TH
+    other-modules:    Text.P3.TH
 
     default-extensions: FunctionalDependencies
                         ImportQualifiedPost

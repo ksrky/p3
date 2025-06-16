@@ -1,4 +1,4 @@
-module P3.Logic
+module Text.P3.Logic
     ( parseLeading
     , parseTrailing
     ) where
@@ -10,8 +10,8 @@ import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.List qualified as L
-import P3.Monad
-import P3.Types
+import Text.P3.Monad
+import Text.P3.Types
 
 longestMatch :: [Parser t] -> ParserM t ()
 longestMatch parsers = do

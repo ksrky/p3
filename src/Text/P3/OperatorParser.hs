@@ -1,7 +1,7 @@
 {-|
 Constructors useful for building `ParserEntry`
 -}
-module P3.OperatorParser
+module Text.P3.OperatorParser
     ( Oper (..)
     , MixfixOp (..)
     , insertMixfixParser
@@ -19,9 +19,9 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
-import P3.Logic
-import P3.Monad
-import P3.Types
+import Text.P3.Logic
+import Text.P3.Monad
+import Text.P3.Types
 
 -- | Operator or Operand
 data Oper t
@@ -42,9 +42,7 @@ data MixfixOp t = MixfixOp
 parseOpers :: Token t => [Oper t] -> ParserM t ()
 parseOpers opers = forM_ opers $ \case
     Operator t -> matchToken (t ==)
-    Operand bp ->
-        local (bindingPower .~ bp)
-        parseLeading
+    Operand bp -> local (bindingPower .~ bp) parseLeading
 
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
 insertMixfixParser MixfixOp{name, opers = []} = error $ "insertMixfixParser: " ++ show name ++ " has no operators."

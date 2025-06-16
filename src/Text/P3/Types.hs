@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveLift #-}
 
-module P3.Types
+module Text.P3.Types
     ( Name (..)
     , BindingPower (..)
     , Token (..)

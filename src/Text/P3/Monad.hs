@@ -1,7 +1,7 @@
 {-# LANGUAGE DerivingVia     #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module P3.Monad
+module Text.P3.Monad
     ( ParserContext (..)
     , initParserContext
     , ParserState (..)
@@ -33,6 +33,7 @@ module P3.Monad
     , getUnindexedParsers
     ) where
 
+import Control.Monad
 import Control.Lens.Combinators
 import Control.Lens.Operators
 import Control.Monad.Except
@@ -40,8 +41,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Map.Strict          qualified as M
 import Data.Semigroup
-import P3.Types
-import Control.Monad
+import Text.P3.Types
 
 -- * Monad
 
@@ -168,7 +168,6 @@ peekToken = do
         x : _ -> return x
         []    -> throwError TokenEOF
 
--- | Match the next token with a predicate.
 matchToken :: (t -> Bool) -> ParserM t ()
 matchToken p = do
     tok <- nextToken

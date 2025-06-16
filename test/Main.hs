@@ -2,13 +2,13 @@
 
 module Main (main) where
 
-import Test.Hspec
-import P3.Combinators
-import P3.Logic
-import P3.Monad
-import P3.OperatorParser
-import P3.TH
 import Control.Lens.Combinators
+import Test.Hspec
+import Text.P3.Combinators
+import Text.P3.Logic
+import Text.P3.Monad
+import Text.P3.OperatorParser
+import Text.P3.TH
 
 parserTbl :: ParserTable String
 parserTbl = mkParserTable [syntaxs|
@@ -28,7 +28,7 @@ parserTbl = mkParserTable [syntaxs|
     Sub         :65 "-" :66
     Mul         :70 "*" :71
     Div         :70 "/" :71
-    Subscript   :100 "[" :0 "]"
+    Subscript   :99 "[" :0 "]"
     IfThenElse  "if" :30 "then" :30 "else" :30
     IfThen      "if" :30 "then" :30
 |]

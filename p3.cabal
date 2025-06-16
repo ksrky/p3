@@ -60,7 +60,6 @@ library
 
     -- Modules exported by the library.
     exposed-modules:  P3.Combinators
-                      P3.Init
                       P3.Logic
                       P3.Monad
                       P3.Types
@@ -125,11 +124,7 @@ test-suite p3-test
     -- The entrypoint to the test suite.
     main-is:          Main.hs
 
-    other-modules:    P3.Example1
-                      P3.Example1.TH
-                      P3.Example2
-                      P3.Example2.Lexer
-                      P3.Example2.TH
+    other-modules:    P3.TH
 
     default-extensions: FunctionalDependencies
                         ImportQualifiedPost

@@ -5,6 +5,7 @@ module P3.OperatorParser
     ( Oper (..)
     , MixfixOp (..)
     , insertMixfixParser
+    , mkParserTable
     , insertInfixParser
     , insertInfixlParser
     , insertInfixrParser
@@ -18,7 +19,6 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
-import P3.Init
 import P3.Logic
 import P3.Monad
 import P3.Types
@@ -76,6 +76,9 @@ insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operand bp1 : opers} = d
             local (reservedTokens <>~ ators) $ parseOpers (Operand bp1 : opers)
             mkNode name arity
     insertUnindexedParser parser
+
+mkParserTable :: Token t => [MixfixOp t] -> ParserTable t
+mkParserTable = foldr insertMixfixParser initParserTable
 
 insertInfixParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
 insertInfixParser name t bp = insertMixfixParser MixfixOp

@@ -64,7 +64,7 @@ library
                       P3.Logic
                       P3.Monad
                       P3.Types
-                      P3.Utils
+                      P3.OperatorParser
 
     -- Modules included in this library but not exported.
     -- other-modules:

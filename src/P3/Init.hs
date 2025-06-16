@@ -2,6 +2,7 @@ module P3.Init
     ( runParser
     , insertLeadingParser
     , insertTrailingParser
+    , insertUnindexedParser
     ) where
 
 import Control.Lens.At
@@ -16,8 +17,9 @@ initParserContext = ParserContext
     { _bindingPower   = minBound
     , _reservedTokens = []
     , _parserTable    = ParserTable 
-        { _leadingParsers  = M.empty
-        , _trailingParsers = M.empty
+        { _leadingParsers   = M.empty
+        , _trailingParsers  = M.empty
+        , _unindexedParsers = []
         }
     }
 
@@ -44,3 +46,6 @@ insertLeadingParser t p = leadingParsers . at t %~ consMaybe p
 
 insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
 insertTrailingParser t p = trailingParsers . at t %~ consMaybe p
+
+insertUnindexedParser :: Parser t -> ParserTable t -> ParserTable t
+insertUnindexedParser p = unindexedParsers %~ (p :)

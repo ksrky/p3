@@ -16,11 +16,14 @@ module P3.Monad
     , mkAtom
     , mkNode
     , ParserTable (..)
+    , HasParserContext (..)
     , HasParserState (..)
     , leadingParsers
     , trailingParsers
+    , unindexedParsers
     , leadingParsersOf
     , trailingParsersOf
+    , getUnindexedParsers
     ) where
 
 import Control.Lens.Combinators
@@ -55,7 +58,7 @@ data Exception
     | LowerBindingPower
     | TokenUnmatched
     | TokenEOF
-    | UnknownParserCategory
+    | UmbigiousSyntax
     deriving (Eq, Show)
     deriving Semigroup via Last Exception
 
@@ -73,8 +76,9 @@ liftParserM :: Except Exception a -> ParserM t a
 liftParserM = lift . lift
 
 data ParserTable t = ParserTable
-    { _leadingParsers  :: M.Map t [Parser t]
-    , _trailingParsers :: M.Map t [Parser t]
+    { _leadingParsers   :: M.Map t [Parser t]
+    , _trailingParsers  :: M.Map t [Parser t]
+    , _unindexedParsers :: [Parser t]
     }
 
 makeClassy ''ParserContext
@@ -149,3 +153,6 @@ leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.look
 
 trailingParsersOf :: Token t => t -> ParserM t [Parser t]
 trailingParsersOf tok = views parserTable $ views trailingParsers (concat . M.lookup tok)
+
+getUnindexedParsers :: ParserM t [Parser t]
+getUnindexedParsers = views parserTable $ view unindexedParsers

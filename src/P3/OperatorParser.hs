@@ -1,7 +1,7 @@
 {-|
 Constructors useful for building `ParserEntry`
 -}
-module P3.Utils
+module P3.OperatorParser
     ( Oper (..)
     , MixfixOp (..)
     , insertMixfixParser
@@ -18,7 +18,6 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
-import P3.Combinators
 import P3.Init
 import P3.Logic
 import P3.Monad
@@ -48,6 +47,8 @@ parseOpers opers = forM_ opers $ \case
         parseLeading
 
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
+insertMixfixParser MixfixOp{name, opers = []} = error $ "insertMixfixParser: " ++ show name ++ " has no operators."
+insertMixfixParser MixfixOp{name, opers = [Operand _]} = error $ "insertMixfixParser: " ++ show name ++ " has no operators."
 insertMixfixParser MixfixOp{name, opers = Operator t0 : opers} = do
     let ators = [t | Operator t <- opers]
         arity = length [() | Operand{} <- opers]
@@ -66,7 +67,15 @@ insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = d
             mkNode name arity
             parseTrailing
     insertTrailingParser t1 parser
-insertMixfixParser _ =  error "invalid mixfix op: an operator does not appear at the first or second position."
+insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operand bp1 : opers} = do
+    let ators = [t | Operator t <- opers]
+        arity = 0 + length [() | Operand{} <- opers]
+        parser = execParserM $ do
+            bp <- view bindingPower
+            when (bp0 < bp) $ throwError LowerBindingPower
+            local (reservedTokens <>~ ators) $ parseOpers (Operand bp1 : opers)
+            mkNode name arity
+    insertUnindexedParser parser
 
 insertInfixParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
 insertInfixParser name t bp = insertMixfixParser MixfixOp

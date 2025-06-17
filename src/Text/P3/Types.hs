@@ -29,12 +29,15 @@ instance Bounded BindingPower where
 class (Show t, Ord t) => Token t where
     tokenString :: t -> String
     tokenString = show
+    isAtomic :: t -> Bool
 
 instance Token String where
     tokenString = show
+    isAtomic _ = True
 
 instance Token T.Text where
     tokenString = T.unpack
+    isAtomic _ = True
 
 -- * Syntax
 

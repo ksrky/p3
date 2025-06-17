@@ -30,7 +30,7 @@ parseLeading = do
     tok <- nextToken
     (longestMatch =<< leadingParsersOf tok)
         `catchError` \case
-            NoMatchParsers -> mkAtom tok
+            NoMatchParsers | isAtomic tok -> mkAtom tok
             e -> throwError e
     parseTrailing
 

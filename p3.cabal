@@ -20,7 +20,7 @@ name:               p3
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.1.0
+version:            0.1.0.0
 
 -- A short (one-line) description of the package.
 -- synopsis:
@@ -35,10 +35,10 @@ license:            BSD-3-Clause
 license-file:       LICENSE
 
 -- The package author(s).
-author:             ksrk
+author:             R.Kashiwagi
 
 -- An email address to which users can send suggestions, bug reports, and patches.
-maintainer:         example@example.com
+maintainer:         kswgrky@gmail.com
 
 -- A copyright notice.
 -- copyright:

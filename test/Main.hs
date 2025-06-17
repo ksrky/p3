@@ -43,7 +43,7 @@ parseStrings inp = case runParser parser inp of
 
 spec :: SpecWith ()
 spec = do
-    describe "Token is just a string" $ do
+    describe "Token is a string" $ do
         it "-3" $ do
             parseStrings ["-", "3"] `shouldReturn` "Neg [\"3\"]"
         it "(1 + 2) * 3" $ do

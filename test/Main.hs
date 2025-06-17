@@ -28,15 +28,18 @@ parserTbl = mkParserTable [syntaxs|
     Sub         :65 "-" :66
     Mul         :70 "*" :71
     Div         :70 "/" :71
-    Subscript   :99 "[" :0 "]"
+    Subscript   :100 "[" :0 "]"
     IfThenElse  "if" :30 "then" :30 "else" :30
     IfThen      "if" :30 "then" :30
 |]
 
 parseStrings :: [String] -> IO String
-parseStrings inp = case runParser (execParserM $ locally parserTable (const parserTbl) (parseLeading <* eof)) inp of
+parseStrings inp = case runParser parser inp of
     Left msg  -> fail $ show msg
     Right stx -> return $ show stx
+  where
+    parser :: Parser String
+    parser = execParserM $ locally parserTable (const parserTbl) (parseLeading <* eof)
 
 spec :: SpecWith ()
 spec = do

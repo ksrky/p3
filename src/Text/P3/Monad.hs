@@ -18,7 +18,6 @@ module Text.P3.Monad
     , runParser
     , insertLeadingParser
     , insertTrailingParser
-    , insertUnindexedParser
     , nextToken
     , nextToken_
     , peekToken
@@ -27,10 +26,8 @@ module Text.P3.Monad
     , mkNode
     , leadingParsers
     , trailingParsers
-    , unindexedParsers
     , leadingParsersOf
     , trailingParsersOf
-    , getUnindexedParsers
     ) where
 
 import Control.Monad
@@ -85,15 +82,12 @@ initParserState toks = ParserState
 data Exception
     = NoMatchParsers
     | LowerBindingPower
-    | TokenUnmatched
     | TokenEOF
-    | UmbigiousSyntax
     deriving (Eq, Show)
     deriving Semigroup via Last Exception
 
 instance Monoid Exception where
     mempty = NoMatchParsers
-
 
 -- ** Parser monad
 
@@ -112,14 +106,12 @@ liftParserM = lift . lift
 data ParserTable t = ParserTable
     { _leadingParsers   :: M.Map t [Parser t]
     , _trailingParsers  :: M.Map t [Parser t]
-    , _unindexedParsers :: [Parser t]
     }
 
 initParserTable :: ParserTable t
 initParserTable = ParserTable
     { _leadingParsers   = M.empty
     , _trailingParsers  = M.empty
-    , _unindexedParsers = []
     }
 
 makeClassy ''ParserContext
@@ -135,9 +127,6 @@ insertLeadingParser t p = leadingParsers . at t %~ consMaybe p
 
 insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
 insertTrailingParser t p = trailingParsers . at t %~ consMaybe p
-
-insertUnindexedParser :: Parser t -> ParserTable t -> ParserTable t
-insertUnindexedParser p = unindexedParsers %~ (p :)
 
 runParser :: Parser t -> [t] -> Either String (Syntax t)
 runParser parser toks = case runExcept (parser initParserContext (initParserState toks)) of
@@ -173,7 +162,7 @@ matchToken p = do
     tok <- nextToken
     if p tok
         then return ()
-        else throwError TokenUnmatched
+        else throwError NoMatchParsers
 
 -- ** Syntax
 
@@ -213,6 +202,3 @@ leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.look
 
 trailingParsersOf :: Token t => t -> ParserM t [Parser t]
 trailingParsersOf tok = views parserTable $ views trailingParsers (concat . M.lookup tok)
-
-getUnindexedParsers :: ParserM t [Parser t]
-getUnindexedParsers = views parserTable $ view unindexedParsers

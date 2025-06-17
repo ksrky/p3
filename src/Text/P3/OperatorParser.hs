@@ -45,8 +45,6 @@ parseOpers opers = forM_ opers $ \case
     Operand bp -> local (bindingPower .~ bp) parseLeading
 
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
-insertMixfixParser MixfixOp{name, opers = []} = error $ "insertMixfixParser: " ++ show name ++ " has no operators."
-insertMixfixParser MixfixOp{name, opers = [Operand _]} = error $ "insertMixfixParser: " ++ show name ++ " has no operators."
 insertMixfixParser MixfixOp{name, opers = Operator t0 : opers} = do
     let ators = [t | Operator t <- opers]
         arity = length [() | Operand{} <- opers]
@@ -65,15 +63,7 @@ insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = d
             mkNode name arity
             parseTrailing
     insertTrailingParser t1 parser
-insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operand bp1 : opers} = do
-    let ators = [t | Operator t <- opers]
-        arity = 0 + length [() | Operand{} <- opers]
-        parser = execParserM $ do
-            bp <- view bindingPower
-            when (bp0 < bp) $ throwError LowerBindingPower
-            local (reservedTokens <>~ ators) $ parseOpers (Operand bp1 : opers)
-            mkNode name arity
-    insertUnindexedParser parser
+insertMixfixParser _ = error "invalid mixfix op: an operator does not appear at the first or second position."
 
 mkParserTable :: Token t => [MixfixOp t] -> ParserTable t
 mkParserTable = foldr insertMixfixParser initParserTable

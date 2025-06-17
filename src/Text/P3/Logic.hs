@@ -19,9 +19,8 @@ longestMatch parsers = do
     st <- get
     sts <- liftParserM $ tryParsers parsers ctx st
     case L.sortOn (negate . view position) sts of
-        []    -> throwError NoMatchParsers
-        [st'] -> put st'
-        _     -> throwError UmbigiousSyntax
+        []     -> throwError NoMatchParsers
+        st': _ -> put st'
 
 tryParsers :: [Parser t] -> ParserContext t -> ParserState t -> Except Exception [ParserState t]
 tryParsers parsers c s = observeAllT $ foldr (\p -> (lift (p c s) `catchError` const empty <|>)) empty parsers
@@ -36,9 +35,9 @@ parseLeading = do
     parseTrailing
 
 parseTrailing :: Token t => ParserM t ()
-parseTrailing = withBacktrack $ longestMatch =<< trailingParsersOf =<< peekToken
-
-withBacktrack :: ParserM t () -> ParserM t ()
-withBacktrack m = catchError m $ \case
-    NoMatchParsers -> longestMatch =<< getUnindexedParsers
-    e -> throwError e
+parseTrailing = do
+    (longestMatch =<< trailingParsersOf =<< peekToken)
+        `catchError` (\case
+            NoMatchParsers -> return ()
+            e -> throwError e)
+    `catchError` (\_ -> return ())

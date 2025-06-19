@@ -2,7 +2,6 @@
 
 module Main (main) where
 
-import Control.Lens.Combinators
 import Test.Hspec
 import Text.P3.Combinators
 import Text.P3.Logic
@@ -29,18 +28,18 @@ parserTbl = mkParserTable [syntaxs|
     Mul         :70 "*" :71
     Div         :70 "/" :71
     Subscript   :100 "[" :0 "]"
-    IfThenElse  "if" :30 "then" :30 "else" :30
-    IfThen      "if" :30 "then" :30
+    IfThenElse  "if" :20 "then" :20 "else" :20
+    IfThen      "if" :20 "then" :20
     App         :100 "(" :0 ")"
 |]
 
 parseStrings :: [String] -> IO String
-parseStrings inp = case runParser parser inp of
+parseStrings inp = case runParser parserTbl parser inp of
     Left msg  -> fail $ show msg
     Right stx -> return $ show stx
   where
     parser :: Parser String
-    parser = execParserM $ locally parserTable (const parserTbl) (parseLeading <* eof)
+    parser = execParserM $ parseLeading <* eof
 
 spec :: SpecWith ()
 spec = do
@@ -58,6 +57,9 @@ spec = do
         it "if 1 == 2 then 3 else if 4 then 5 else 6" $ do
             parseStrings ["if", "1", "==", "2", "then", "3", "else", "if", "4", "then", "5", "else", "6"]
                 `shouldReturn` "IfThenElse [Eq [\"1\", \"2\"], \"3\", IfThenElse [\"4\", \"5\", \"6\"]]"
+        it "if 1 then if 2 then 3 else 4" $ do
+            parseStrings ["if", "1", "then", "if", "2", "then", "3", "else", "4"]
+                `shouldReturn` "IfThen [\"1\", IfThenElse [\"2\", \"3\", \"4\"]]"
         it "x, y, z" $ do
             parseStrings ["x", ",", "y", ",", "z"] `shouldReturn` "Pair [\"x\", Pair [\"y\", \"z\"]]"
         it "1 - -2" $ do

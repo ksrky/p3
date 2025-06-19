@@ -1,3 +1,6 @@
+{-|
+Utilities for writing parser combinators in P3.
+-}
 module Text.P3.Combinators
     ( eof
     , satisfy
@@ -26,6 +29,7 @@ eof = do
         [] -> return ()
         _  -> mzero
 
+-- | Match a token with a predicate.
 satisfy :: (t -> Bool) -> ParserM t t
 satisfy p = do
     tok <- nextToken
@@ -33,6 +37,7 @@ satisfy p = do
         then return tok
         else empty
 
+-- | Consume a given token.
 token :: Eq t => t -> ParserM t ()
 token t = void $ matchToken (t ==)
 

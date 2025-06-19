@@ -1,3 +1,6 @@
+{-|
+Core logic of P3 algorithm.
+-}
 module Text.P3.Logic
     ( parseLeading
     , parseTrailing
@@ -9,7 +12,7 @@ import Control.Monad.Except
 import Control.Monad.Logic
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.List qualified as L
+import Data.List                qualified as L
 import Text.P3.Monad
 import Text.P3.Types
 

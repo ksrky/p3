@@ -1,39 +1,52 @@
 {-# LANGUAGE DerivingVia     #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-|
+Contexts, states and monads for P3 parser.
+-}
 module Text.P3.Monad
-    ( ParserContext (..)
+    ( -- * Data types for parser monad
+      -- ** Parser context
+      ParserContext (..)
     , initParserContext
+    , HasParserContext (..)
+      -- ** Parser state
     , ParserState (..)
     , initParserState
+    , HasParserState (..)
+      -- ** Parser exceptions
     , Exception (..)
+      -- ** Parser table
+    , ParserTable (..)
+    , leadingParsers
+    , trailingParsers
+    , initParserTable
+    , insertLeadingParser
+    , insertTrailingParser
+      -- * Parser monad
     , Parser
     , ParserM
     , execParserM
     , liftParserM
-    , ParserTable (..)
-    , HasParserContext (..)
-    , HasParserState (..)
-    , initParserTable
+      -- ** Running parsers
     , runParser
     , runParser'
-    , insertLeadingParser
-    , insertTrailingParser
+      -- ** Managing token stream
     , nextToken
     , nextToken_
     , peekToken
     , matchToken
+      -- ** Managing SyntaxStack
     , mkAtom
     , mkNode
-    , leadingParsers
-    , trailingParsers
+      -- ** Managing ParserTable
     , leadingParsersOf
     , trailingParsersOf
     ) where
 
-import Control.Monad
 import Control.Lens.Combinators
 import Control.Lens.Operators
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
@@ -41,31 +54,23 @@ import Data.Map.Strict          qualified as M
 import Data.Semigroup
 import Text.P3.Types
 
--- * Monad
-
--- ** Parser context
-
 -- | Reader context for parser.
 data ParserContext t = ParserContext
-    { _bindingPower   :: BindingPower
-    , _parserTable    :: ParserTable t
+    { _bindingPower :: BindingPower  -- ^ Current binding power.
+    , _parserTable  :: ParserTable t -- ^ Parser table indexed by tokens.
     }
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext
-    { _bindingPower   = minBound
-    , _parserTable    = initParserTable
+    { _bindingPower = minBound
+    , _parserTable  = initParserTable
     }
 
--- ** Parser state
-
+-- | State for parser.
 data ParserState t = ParserState
-    { -- | Stored parse results.
-      _stxStack :: SyntaxStack t
-      -- | Input token stream.
-    , _tokens   :: [t]
-      -- | Position in the token stream.
-    , _position :: Int
+    { _stxStack :: SyntaxStack t -- ^ Stored parse results.
+    , _tokens   :: [t]           -- ^ Input token stream.
+    , _position :: Int           -- ^ Position in the token stream.
     }
 
 initParserState :: [t] -> ParserState t
@@ -74,8 +79,6 @@ initParserState toks = ParserState
     , _tokens = toks
     , _position = 0
     }
-
--- ** Parser exceptions
 
 data Exception
     = NoMatchParsers
@@ -87,13 +90,11 @@ data Exception
 instance Monoid Exception where
     mempty = NoMatchParsers
 
--- ** Parser monad
-
 type Parser t = ParserContext t -> ParserState t -> Except Exception (ParserState t)
 
 type ParserM t = ReaderT (ParserContext t) (StateT (ParserState t)  (Except Exception))
 
-execParserM :: ParserM t a -> ParserContext t -> ParserState t -> Except Exception (ParserState t)
+execParserM :: ParserM t a -> Parser t
 execParserM m = execStateT . runReaderT m
 
 liftParserM :: Except Exception a -> ParserM t a
@@ -101,9 +102,10 @@ liftParserM = lift . lift
 
 -- ** Parser table
 
+-- | A table containing leading and trailing parsers indexed by tokens.
 data ParserTable t = ParserTable
-    { _leadingParsers   :: M.Map t [Parser t]
-    , _trailingParsers  :: M.Map t [Parser t]
+    { _leadingParsers  :: M.Map t [Parser t]
+    , _trailingParsers :: M.Map t [Parser t]
     }
 
 initParserTable :: ParserTable t
@@ -117,7 +119,7 @@ makeClassy ''ParserState
 makeLenses ''ParserTable
 
 consMaybe :: a -> Maybe [a] -> Maybe [a]
-consMaybe x Nothing = Just [x]
+consMaybe x Nothing   = Just [x]
 consMaybe x (Just xs) = Just (x : xs)
 
 insertLeadingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
@@ -135,8 +137,6 @@ runParser tbl parser toks = case runExcept (parser initParserContext{_parserTabl
 
 runParser' :: Parser t -> [t] -> Either String (Syntax t)
 runParser' = runParser initParserTable
-
--- ** Token
 
 -- | Get the next token and consume it from the token stream.
 nextToken :: ParserM t t

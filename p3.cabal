@@ -58,7 +58,7 @@ library
                     -Wpartial-fields
                     -Wredundant-constraints
 
-    build-depends:    base ^>=4.19.2.0,
+    build-depends:    base ^>= 4.19.2.0,
                       containers ^>= 0.6.8,
                       lens ^>= 5.3.4,
                       logict ^>= 0.8.2.0,

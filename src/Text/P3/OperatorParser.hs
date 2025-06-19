@@ -6,11 +6,11 @@ module Text.P3.OperatorParser
     , MixfixOp (..)
     , insertMixfixParser
     , mkParserTable
-    , insertInfixParser
-    , insertInfixlParser
-    , insertInfixrParser
-    , insertPrefixParser
-    , insertPostfixParser
+    , infixOp
+    , infixlOp
+    , infixrOp
+    , prefixOp
+    , postfixOp
     ) where
 
 import Control.Lens.Combinators
@@ -46,20 +46,18 @@ parseOpers opers = forM_ opers $ \case
 
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
 insertMixfixParser MixfixOp{name, opers = Operator t0 : opers} = do
-    let ators = [t | Operator t <- opers]
-        arity = length [() | Operand{} <- opers]
+    let arity = length [() | Operand{} <- opers]
         parser = execParserM $ do
-            local (reservedTokens <>~ ators) $ parseOpers opers
+            parseOpers opers
             mkNode name arity
     insertLeadingParser t0 parser
 insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = do
-    let ators = [t | Operator t <- opers]
-        arity = 1 + length [() | Operand{} <- opers]
+    let arity = 1 + length [() | Operand{} <- opers]
         parser = execParserM $ do
             bp <- view bindingPower
             when (bp0 < bp) $ throwError LowerBindingPower
             nextToken_
-            local (reservedTokens <>~ ators) $ parseOpers opers
+            parseOpers opers
             mkNode name arity
             parseTrailing
     insertTrailingParser t1 parser
@@ -68,32 +66,17 @@ insertMixfixParser _ = error "invalid mixfix op: an operator does not appear at 
 mkParserTable :: Token t => [MixfixOp t] -> ParserTable t
 mkParserTable = foldr insertMixfixParser initParserTable
 
-insertInfixParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
-insertInfixParser name t bp = insertMixfixParser MixfixOp
-    { name = name
-    , opers = [Operand bp, Operator t, Operand bp]
-    }
+infixOp :: t -> BindingPower -> [Oper t]
+infixOp t bp = [Operand bp, Operator t, Operand bp]
 
-insertInfixlParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
-insertInfixlParser name t bp = insertMixfixParser MixfixOp
-    { name = name
-    , opers = [Operand (succ bp), Operator t, Operand bp]
-    }
+infixlOp :: t -> BindingPower -> [Oper t]
+infixlOp t bp = [Operand (succ bp), Operator t, Operand bp]
 
-insertInfixrParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
-insertInfixrParser name t bp = insertMixfixParser MixfixOp
-    { name = name
-    , opers = [Operand bp, Operator t, Operand (succ bp)]
-    }
+infixrOp :: t -> BindingPower -> [Oper t]
+infixrOp t bp = [Operand bp, Operator t, Operand (succ bp)]
 
-insertPrefixParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
-insertPrefixParser name t bp = insertMixfixParser MixfixOp
-    { name = name
-    , opers = [Operator t, Operand bp]
-    }
+prefixOp :: t -> BindingPower -> [Oper t]
+prefixOp t bp = [Operator t, Operand bp]
 
-insertPostfixParser :: Token t => Name -> t -> BindingPower -> ParserTable t -> ParserTable t
-insertPostfixParser name t bp = insertMixfixParser MixfixOp
-    { name = name
-    , opers = [Operand bp, Operator t]
-    }
+postfixOp :: t -> BindingPower -> [Oper t]
+postfixOp t bp = [Operand bp, Operator t]

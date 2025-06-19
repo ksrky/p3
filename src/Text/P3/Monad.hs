@@ -16,6 +16,7 @@ module Text.P3.Monad
     , HasParserState (..)
     , initParserTable
     , runParser
+    , runParser'
     , insertLeadingParser
     , insertTrailingParser
     , nextToken
@@ -47,15 +48,12 @@ import Text.P3.Types
 -- | Reader context for parser.
 data ParserContext t = ParserContext
     { _bindingPower   :: BindingPower
-      -- | Scoped reserved keywords.
-    , _reservedTokens :: [t]
     , _parserTable    :: ParserTable t
     }
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext
     { _bindingPower   = minBound
-    , _reservedTokens = []
     , _parserTable    = initParserTable
     }
 
@@ -128,12 +126,15 @@ insertLeadingParser t p = leadingParsers . at t %~ consMaybe p
 insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
 insertTrailingParser t p = trailingParsers . at t %~ consMaybe p
 
-runParser :: Parser t -> [t] -> Either String (Syntax t)
-runParser parser toks = case runExcept (parser initParserContext (initParserState toks)) of
+runParser :: ParserTable t -> Parser t -> [t] -> Either String (Syntax t)
+runParser tbl parser toks = case runExcept (parser initParserContext{_parserTable = tbl} (initParserState toks)) of
     Left e -> Left $ show e
     Right s
         | [stx] <- s ^. stxStack -> Right stx
-        | otherwise -> Left "runParser: invalid sytax stack"
+        | otherwise -> Left "runParser': invalid sytax stack"
+
+runParser' :: Parser t -> [t] -> Either String (Syntax t)
+runParser' = runParser initParserTable
 
 -- ** Token
 
@@ -196,9 +197,9 @@ mkNode name = mkNode' []
             mkNode' (stx : stxs) (n - 1)
 
 -- ** Parser Table
- 
+
 leadingParsersOf :: Token t => t -> ParserM t [Parser t]
-leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.lookup tok) 
+leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.lookup tok)
 
 trailingParsersOf :: Token t => t -> ParserM t [Parser t]
 trailingParsersOf tok = views parserTable $ views trailingParsers (concat . M.lookup tok)

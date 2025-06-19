@@ -31,6 +31,7 @@ parserTbl = mkParserTable [syntaxs|
     Subscript   :100 "[" :0 "]"
     IfThenElse  "if" :30 "then" :30 "else" :30
     IfThen      "if" :30 "then" :30
+    App         :100 "(" :0 ")"
 |]
 
 parseStrings :: [String] -> IO String
@@ -65,6 +66,10 @@ spec = do
             parseStrings ["(", ")"] `shouldReturn` "Unit []"
         it "a[1][2]" $ do
             parseStrings ["a", "[", "1", "]", "[", "2", "]"] `shouldReturn` "Subscript [Subscript [\"a\", \"1\"], \"2\"]"
+        it "f(x)" $ do
+            parseStrings ["f", "(", "x", ")"] `shouldReturn` "App [\"f\", \"x\"]"
+        it "f(x, y)" $ do
+            parseStrings ["f", "(", "x", ",", "y", ")"] `shouldReturn` "App [\"f\", Pair [\"x\", \"y\"]]"
 
 main :: IO ()
 main = hspec spec

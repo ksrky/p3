@@ -44,13 +44,13 @@ parseOpers (Operand bp : opers) ctx = parseOpers opers ctx . parseLeading ctx{bi
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
 insertMixfixParser MixfixOp{name, opers = Operator t0 : opers} = do
     let arity = length [() | Operand{} <- opers]
-        parser = parseOpers opers >.> const (mkNode name arity)
+        parser = parseOpers opers >>> const (mkNode name arity)
     insertLeadingParser t0 parser
 insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = do
     let arity = 1 + length [() | Operand{} <- opers]
         parser ctx
             | bp0 < bindingPower ctx = \st -> st{errorMsg = Just "lower binding power"}
-            | otherwise = (shift >.> parseOpers opers >.> const (mkNode name arity) >.> parseTrailing) ctx
+            | otherwise = (shift >>> parseOpers opers >>> const (mkNode name arity) >>> parseTrailing) ctx
     insertTrailingParser t1 parser
 insertMixfixParser _ = error "invalid mixfix op: an operator does not appear at the first or second position."
 

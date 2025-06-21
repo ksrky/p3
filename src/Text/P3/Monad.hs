@@ -13,29 +13,24 @@ module Text.P3.Monad
     , initParserState
     , hasError
     , recoverError
+    , throwError
       -- ** Parser table
     , ParserTable (..)
     , initParserTable
     , insertLeadingParser
     , insertTrailingParser
-      -- * Parser monad
-    , Parser
-    , (>.>)
-      -- ** Running parsers
-    , runParser
-    , runParser'
-      -- ** Managing token stream
-    , shift
-    , matchToken
-      -- ** Managing SyntaxStack
-    , mkAtom
-    , mkNode
-      -- ** Managing ParserTable
     , leadingParsersOf
     , trailingParsersOf
+    , Parser
+    , (>>>)
+    , runParser
+    , shift
+    , matchToken
+    , mkAtom
+    , mkNode
     ) where
 
-import Data.Map.Strict          qualified as M
+import Data.Map.Strict qualified as M
 import Text.P3.Types
 
 -- | Reader context for parser.
@@ -78,12 +73,15 @@ hasError st = errorMsg st /= Nothing
 recoverError :: ParserState t -> ParserState t
 recoverError st = st{errorMsg = Nothing}
 
+throwError :: String -> ParserState t -> ParserState t
+throwError msg st = st{errorMsg = Just msg}
+
 type Parser t = ParserContext t -> ParserState t -> ParserState t
 
-infixl 9 >.>
+infixl 9 >>>
 
-(>.>) :: Parser t -> Parser t -> Parser t
-(>.>) p1 p2 ctx = p2 ctx . p1 ctx
+(>>>) :: Parser t -> Parser t -> Parser t
+(>>>) p1 p2 ctx = p2 ctx . p1 ctx
 
 -- | A table containing leading and trailing parsers indexed by tokens.
 data ParserTable t = ParserTable
@@ -103,24 +101,30 @@ insertLeadingParser t p tbl = tbl{leadingParsers = M.insertWith (++) t [p] (lead
 insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
 insertTrailingParser t p tbl = tbl{trailingParsers = M.insertWith (++) t [p] (trailingParsers tbl)}
 
+leadingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
+leadingParsersOf ctx (Token t) = concat $ leadingParsers (parserTable ctx) M.!? t
+leadingParsersOf _ Terminator = []
+
+trailingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
+trailingParsersOf ctx (Token t) = concat $ trailingParsers (parserTable ctx) M.!? t
+trailingParsersOf _ Terminator = []
+
 runParser :: ParserTable t -> Parser t -> [t] -> Either String (Syntax t)
 runParser tbl parser ts =
     let st = parser initParserContext{parserTable = tbl} (initParserState ts) in
     case (errorMsg st, stxStack st) of
         (Just msg, _)    -> Left msg
         (Nothing, [stx]) -> Right stx
-        (Nothing, _)     -> Left "runParser: invalid sytax stack"
+        (Nothing, _)     -> error "runParser: invalid sytax stack"
 
-runParser' :: Parser t -> [t] -> Either String (Syntax t)
-runParser' = runParser initParserTable
-
--- | Get the next token and consume it from the token stream.
+-- | Update the current token and position in the parser state.
 shift :: Parser t
 shift _ st = do 
     case tokens st of
         x : xs -> st{peek = x, tokens = xs, position = position st + 1}
         []     -> st
 
+-- | Match the current token with a predicate and shift the state if it matches.
 matchToken :: (Tok t -> Bool) -> Parser t
 matchToken p ctx st = do 
     if p (peek st)
@@ -143,11 +147,3 @@ mkNode name n st | n > length (stxStack st) = st{errorMsg = Just $ "Not enough s
 mkNode name n st = 
     let (stxs, rest) = splitAt n (stxStack st) in
     st{stxStack = Node name (reverse stxs) : rest}
-
-leadingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
-leadingParsersOf ctx (Token t) = concat $ leadingParsers (parserTable ctx) M.!? t
-leadingParsersOf _ Terminator = []
-
-trailingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
-trailingParsersOf ctx (Token t) = concat $ trailingParsers (parserTable ctx) M.!? t
-trailingParsersOf _ Terminator = []

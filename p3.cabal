@@ -35,7 +35,8 @@ common warnings
 library
     import:           warnings
 
-    exposed-modules:  Text.P3.Combinators
+    exposed-modules:  Text.P3
+                      Text.P3.Combinators
                       Text.P3.Logic
                       Text.P3.Monad
                       Text.P3.Types

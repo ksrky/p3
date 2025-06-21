@@ -7,6 +7,7 @@ module Text.P3.Types
     ( Name (..)
     , BindingPower (..)
     , Token (..)
+    , Tok (..)
     , Syntax (..)
     , SyntaxStack
     ) where
@@ -43,6 +44,13 @@ instance Token String where
 instance Token T.Text where
     tokenString = T.unpack
     isAtomic _ = True
+
+data Tok t
+    = -- | Input token.
+      Token t
+    | -- | A special token that indicates the end of the token stream.
+      Terminator
+    deriving (Eq, Ord, Show, Lift)
 
 -- | Generalized syntax tree.
 data Syntax t

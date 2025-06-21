@@ -1,5 +1,4 @@
 {-# LANGUAGE DerivingVia     #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 {-|
 Contexts, states and monads for P3 parser.
@@ -9,32 +8,24 @@ module Text.P3.Monad
       -- ** Parser context
       ParserContext (..)
     , initParserContext
-    , HasParserContext (..)
       -- ** Parser state
     , ParserState (..)
     , initParserState
-    , HasParserState (..)
-      -- ** Parser exceptions
-    , Exception (..)
+    , hasError
+    , recoverError
       -- ** Parser table
     , ParserTable (..)
-    , leadingParsers
-    , trailingParsers
     , initParserTable
     , insertLeadingParser
     , insertTrailingParser
       -- * Parser monad
     , Parser
-    , ParserM
-    , execParserM
-    , liftParserM
+    , (>.>)
       -- ** Running parsers
     , runParser
     , runParser'
       -- ** Managing token stream
-    , nextToken
-    , nextToken_
-    , peekToken
+    , shift
     , matchToken
       -- ** Managing SyntaxStack
     , mkAtom
@@ -44,162 +35,119 @@ module Text.P3.Monad
     , trailingParsersOf
     ) where
 
-import Control.Lens.Combinators
-import Control.Lens.Operators
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State
 import Data.Map.Strict          qualified as M
-import Data.Semigroup
 import Text.P3.Types
 
 -- | Reader context for parser.
 data ParserContext t = ParserContext
-    { _bindingPower :: BindingPower  -- ^ Current binding power.
-    , _parserTable  :: ParserTable t -- ^ Parser table indexed by tokens.
+    { bindingPower :: BindingPower  -- ^ Current binding power.
+    , parserTable  :: ParserTable t -- ^ Parser table indexed by tokens.
     }
 
 initParserContext :: ParserContext t
 initParserContext = ParserContext
-    { _bindingPower = minBound
-    , _parserTable  = initParserTable
+    { bindingPower = minBound
+    , parserTable  = initParserTable
     }
 
 -- | State for parser.
 data ParserState t = ParserState
-    { _stxStack :: SyntaxStack t -- ^ Stored parse results.
-    , _tokens   :: [t]           -- ^ Input token stream.
-    , _position :: Int           -- ^ Position in the token stream.
+    { stxStack :: SyntaxStack t -- ^ Stored parse results.
+    , peek     :: Tok t         -- ^ Next token to be processed. `Nothing` means the end of the token stream.
+    , tokens   :: [Tok t]       -- ^ Input token stream.
+    , position :: Int           -- ^ Position in the token stream.
+    , errorMsg :: Maybe String  -- ^ Error message, if any.
     }
 
 initParserState :: [t] -> ParserState t
-initParserState toks = ParserState
-    { _stxStack = []
-    , _tokens = toks
-    , _position = 0
+initParserState ts = ParserState
+    { stxStack = []
+    , peek
+    , tokens
+    , position = 0
+    , errorMsg = Nothing
     }
+  where
+    (peek, tokens) = case ts of
+        []     -> (Terminator, [])
+        x : xs -> (Token x, map Token xs ++ [Terminator])
 
-data Exception
-    = NoMatchParsers
-    | LowerBindingPower
-    | TokenEOF
-    deriving (Eq, Show)
-    deriving Semigroup via Last Exception
+hasError :: ParserState t -> Bool
+hasError st = errorMsg st /= Nothing
 
-instance Monoid Exception where
-    mempty = NoMatchParsers
+recoverError :: ParserState t -> ParserState t
+recoverError st = st{errorMsg = Nothing}
 
-type Parser t = ParserContext t -> ParserState t -> Except Exception (ParserState t)
+type Parser t = ParserContext t -> ParserState t -> ParserState t
 
-type ParserM t = ReaderT (ParserContext t) (StateT (ParserState t)  (Except Exception))
+infixl 9 >.>
 
-execParserM :: ParserM t a -> Parser t
-execParserM m = execStateT . runReaderT m
-
-liftParserM :: Except Exception a -> ParserM t a
-liftParserM = lift . lift
-
--- ** Parser table
+(>.>) :: Parser t -> Parser t -> Parser t
+(>.>) p1 p2 ctx = p2 ctx . p1 ctx
 
 -- | A table containing leading and trailing parsers indexed by tokens.
 data ParserTable t = ParserTable
-    { _leadingParsers  :: M.Map t [Parser t]
-    , _trailingParsers :: M.Map t [Parser t]
+    { leadingParsers  :: M.Map t [Parser t]
+    , trailingParsers :: M.Map t [Parser t]
     }
 
 initParserTable :: ParserTable t
 initParserTable = ParserTable
-    { _leadingParsers   = M.empty
-    , _trailingParsers  = M.empty
+    { leadingParsers  = M.empty
+    , trailingParsers = M.empty
     }
 
-makeClassy ''ParserContext
-makeClassy ''ParserState
-makeLenses ''ParserTable
-
-consMaybe :: a -> Maybe [a] -> Maybe [a]
-consMaybe x Nothing   = Just [x]
-consMaybe x (Just xs) = Just (x : xs)
-
 insertLeadingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
-insertLeadingParser t p = leadingParsers . at t %~ consMaybe p
+insertLeadingParser t p tbl = tbl{leadingParsers = M.insertWith (++) t [p] (leadingParsers tbl)}
 
 insertTrailingParser :: Token t => t -> Parser t -> ParserTable t -> ParserTable t
-insertTrailingParser t p = trailingParsers . at t %~ consMaybe p
+insertTrailingParser t p tbl = tbl{trailingParsers = M.insertWith (++) t [p] (trailingParsers tbl)}
 
 runParser :: ParserTable t -> Parser t -> [t] -> Either String (Syntax t)
-runParser tbl parser toks = case runExcept (parser initParserContext{_parserTable = tbl} (initParserState toks)) of
-    Left e -> Left $ show e
-    Right s
-        | [stx] <- s ^. stxStack -> Right stx
-        | otherwise -> Left "runParser': invalid sytax stack"
+runParser tbl parser ts =
+    let st = parser initParserContext{parserTable = tbl} (initParserState ts) in
+    case (errorMsg st, stxStack st) of
+        (Just msg, _)    -> Left msg
+        (Nothing, [stx]) -> Right stx
+        (Nothing, _)     -> Left "runParser: invalid sytax stack"
 
 runParser' :: Parser t -> [t] -> Either String (Syntax t)
 runParser' = runParser initParserTable
 
 -- | Get the next token and consume it from the token stream.
-nextToken :: ParserM t t
-nextToken = do
-    toks <- use tokens
-    case toks of
-        x : xs -> tokens .= xs >> position %= (+ 1) >> return x
-        []     -> throwError TokenEOF
+shift :: Parser t
+shift _ st = do 
+    case tokens st of
+        x : xs -> st{peek = x, tokens = xs, position = position st + 1}
+        []     -> st
 
--- | `nextToken` but discard the token.
-nextToken_ :: ParserM t ()
-nextToken_ = void nextToken
-
--- | Get the next token without consuming it.
-peekToken :: ParserM t t
-peekToken = do
-    toks <- use tokens
-    case toks of
-        x : _ -> return x
-        []    -> throwError TokenEOF
-
-matchToken :: (t -> Bool) -> ParserM t ()
-matchToken p = do
-    tok <- nextToken
-    if p tok
-        then return ()
-        else throwError NoMatchParsers
-
--- ** Syntax
+matchToken :: (Tok t -> Bool) -> Parser t
+matchToken p ctx st = do 
+    if p (peek st)
+        then shift ctx st
+        else st{errorMsg = Just "No match parsers"}
 
 -- | Push a syntax node to the syntax stack.
-pushSyntax :: Syntax t -> ParserM t ()
-pushSyntax stx = stxStack %= (stx :)
-
--- | Pop a syntax node from the syntax stack.
-popSyntax :: ParserM t (Syntax t)
-popSyntax = do
-    stxs <- use stxStack
-    case stxs of
-        [] -> throwError TokenEOF
-        stx : stxs' -> do
-            stxStack .= stxs'
-            return stx
+pushSyntax :: Syntax t -> ParserState t -> ParserState t
+pushSyntax stx st = st{stxStack = stx : stxStack st}
 
 -- | Push `Atom` to the syntax stack.
-mkAtom :: t -> ParserM t ()
-mkAtom = pushSyntax . Atom
+mkAtom :: Tok t -> Parser t
+mkAtom (Token t) _ = pushSyntax (Atom t)
+mkAtom Terminator _ = id
 
--- | Push `Node` to the syntax stack.
-mkNode :: Name -> Int -> ParserM t ()
-mkNode name = mkNode' []
-  where
-    mkNode' :: [Syntax t] -> Int -> ParserM t ()
-    mkNode' stxs n
-        | n <= 0 = pushSyntax $ Node name stxs
-        | otherwise = do
-            stx <- popSyntax
-            mkNode' (stx : stxs) (n - 1)
+-- | Push `Node` to the syntax stack. Reduce operation.
+mkNode :: Name -> Int -> ParserState t -> ParserState t
+mkNode _ n _ | n < 0 = error "mkNode: negative arity"
+mkNode name n st | n > length (stxStack st) = st{errorMsg = Just $ "Not enough syntax stack for " ++ show name}
+mkNode name n st = 
+    let (stxs, rest) = splitAt n (stxStack st) in
+    st{stxStack = Node name (reverse stxs) : rest}
 
--- ** Parser Table
+leadingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
+leadingParsersOf ctx (Token t) = concat $ leadingParsers (parserTable ctx) M.!? t
+leadingParsersOf _ Terminator = []
 
-leadingParsersOf :: Token t => t -> ParserM t [Parser t]
-leadingParsersOf tok = views parserTable $ views leadingParsers (concat . M.lookup tok)
-
-trailingParsersOf :: Token t => t -> ParserM t [Parser t]
-trailingParsersOf tok = views parserTable $ views trailingParsers (concat . M.lookup tok)
+trailingParsersOf :: Token t => ParserContext t -> Tok t -> [Parser t]
+trailingParsersOf ctx (Token t) = concat $ trailingParsers (parserTable ctx) M.!? t
+trailingParsersOf _ Terminator = []

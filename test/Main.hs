@@ -34,12 +34,9 @@ parserTbl = mkParserTable [syntaxs|
 |]
 
 parseStrings :: [String] -> IO String
-parseStrings inp = case runParser parserTbl parser inp of
+parseStrings inp = case runParser parserTbl (parseLeading <* eof) inp of
     Left msg  -> fail $ show msg
-    Right stx -> return $ show stx
-  where
-    parser :: Parser String
-    parser = execParserM $ parseLeading <* eof
+    Right stx -> return $ show stx 
 
 spec :: SpecWith ()
 spec = do

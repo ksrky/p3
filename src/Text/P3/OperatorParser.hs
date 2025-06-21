@@ -13,11 +13,6 @@ module Text.P3.OperatorParser
     , postfixOp
     ) where
 
-import Control.Lens.Combinators
-import Control.Lens.Operators
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.Reader.Class
 import Language.Haskell.TH.Syntax (Lift)
 import Text.P3.Logic
 import Text.P3.Monad
@@ -40,28 +35,22 @@ data MixfixOp t = MixfixOp
     deriving (Show, Lift)
 
 -- | Build a parser from Operator/Operand list.
-parseOpers :: Token t => [Oper t] -> ParserM t ()
-parseOpers opers = forM_ opers $ \case
-    Operator t -> matchToken (t ==)
-    Operand bp -> local (bindingPower .~ bp) parseLeading
+parseOpers :: Token t => [Oper t] -> Parser t
+parseOpers [] _ = id
+parseOpers (Operator t : opers) ctx = parseOpers opers ctx . matchToken (Token t ==) ctx
+parseOpers (Operand bp : opers) ctx = parseOpers opers ctx . parseLeading ctx{bindingPower = bp}
 
 -- | Insert a parser for a mixfix operator into a parser table.
 insertMixfixParser :: Token t => MixfixOp t -> ParserTable t -> ParserTable t
 insertMixfixParser MixfixOp{name, opers = Operator t0 : opers} = do
     let arity = length [() | Operand{} <- opers]
-        parser = execParserM $ do
-            parseOpers opers
-            mkNode name arity
+        parser = parseOpers opers >.> const (mkNode name arity)
     insertLeadingParser t0 parser
 insertMixfixParser MixfixOp{name, opers = Operand bp0 : Operator t1 : opers} = do
     let arity = 1 + length [() | Operand{} <- opers]
-        parser = execParserM $ do
-            bp <- view bindingPower
-            when (bp0 < bp) $ throwError LowerBindingPower
-            nextToken_
-            parseOpers opers
-            mkNode name arity
-            parseTrailing
+        parser ctx
+            | bp0 < bindingPower ctx = \st -> st{errorMsg = Just "lower binding power"}
+            | otherwise = (shift >.> parseOpers opers >.> const (mkNode name arity) >.> parseTrailing) ctx
     insertTrailingParser t1 parser
 insertMixfixParser _ = error "invalid mixfix op: an operator does not appear at the first or second position."
 

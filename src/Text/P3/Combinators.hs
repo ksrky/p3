@@ -5,62 +5,38 @@ module Text.P3.Combinators
     ( eof
     , satisfy
     , token
-    , choice
     , between
-    , optional
-    , many
-    , some
-    , sepBy
-    , sepBy1
-    , endBy
-    , endBy1
+    , (<|<)
+    , choice
     ) where
 
-import Control.Applicative
-import Control.Lens.Combinators
-import Control.Monad
 import Text.P3.Monad
+import Text.P3.Types
 
 -- | Check if there's no more token.
-eof :: ParserM t ()
-eof = do
-    toks <- use tokens
-    case toks of
-        [] -> return ()
-        _  -> mzero
+eof :: Parser t
+eof _ st | null (tokens st) = st
+         | otherwise = st{errorMsg = Just "Unexpected the end of token stream"}
 
 -- | Match a token with a predicate.
-satisfy :: (t -> Bool) -> ParserM t t
-satisfy p = do
-    tok <- nextToken
-    if p tok
-        then return tok
-        else empty
+satisfy :: (Tok t -> Bool) -> Parser t
+satisfy p ctx st = do
+    let st' = shift ctx st
+    if p (peek st)
+        then st'
+        else st'{errorMsg = Just "No match token"}
 
 -- | Consume a given token.
-token :: Eq t => t -> ParserM t ()
-token t = void $ matchToken (t ==)
+token :: Eq t => t -> Parser t
+token t = matchToken (Token t ==)
 
-between :: Eq t => t -> t -> ParserM t a -> ParserM t a
-between open close p = do
-    token open
-    x <- p
-    token close
-    return x
+between :: Eq t => t -> t -> Parser t -> Parser t
+between open close p = token open >.> p >.> token close
 
-choice :: [ParserM t a] -> ParserM t a
-choice []       = empty
-choice [p]      = p
-choice (p : ps) = p <|> choice ps
+(<|<) :: Parser t -> Parser t -> Parser t
+(<|<) p1 p2 ctx st = case p1 ctx st of
+    st' | hasError st' -> p2 ctx st'
+        | otherwise    -> st'
 
-sepBy1 :: Eq t => ParserM t a -> t -> ParserM t [a]
-sepBy1 p sep = liftM2 (:) p $ many $ token sep >> p
-
-sepBy :: Eq t => ParserM t a -> t -> ParserM t [a]
-sepBy p sep = sepBy1 p sep <|> return []
-
-endBy :: Eq t => ParserM t a -> t -> ParserM t [a]
-endBy p sep = many (do x <- p ; _ <- token sep ; return x)
-
-endBy1 :: Eq t => ParserM t a -> t -> ParserM t [a]
-endBy1 p sep = some (do x <- p ; _ <- token sep ; return x)
+choice :: [Parser t] -> Parser t
+choice = foldr (<|<) (const id)
